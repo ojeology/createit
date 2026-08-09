@@ -461,7 +461,7 @@ def challenges_list():
 def challenge_detail(cid):
     me = current_user()
     r = get_challenge(cid)
-    if not r: return jsonify(error="Not found"), 404
+    if not r: return jsonify(error="This challenge has left the Arena."), 404
     board = []
     for row in qa("""SELECT v.user_id uid, COUNT(*) n, MAX(v.score) best,
                      MAX(CASE WHEN v.score>=100 THEN 1 ELSE 0 END) qual FROM videos v

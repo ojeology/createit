@@ -997,3 +997,199 @@ body::after{animation:none;filter:blur(80px)}
   *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
 }
 .disc-top .dt-close .ic{transform:rotate(180deg)}
+
+/* ============================================================
+   v9 — COMPLETE VISUAL IDENTITY REBUILD
+   ============================================================ */
+/* ---- DESIGN TOKENS ---- */
+:root{
+  --bg:#0a0c11;            /* deep graphite base */
+  --bg2:#0e1117;
+  --surface:#141822;       /* card surface */
+  --surface2:#1a1f2c;      /* elevated surface */
+  --surface3:#232a3a;
+  --line:rgba(255,255,255,.075);
+  --line2:rgba(255,255,255,.15);
+  --text:#f2f3f5;          /* primary text */
+  --mut:#9aa1af;           /* secondary text */
+  --dim:#5b6270;           /* muted text */
+  --brand:#e14e2a;         /* CreateIt Ember — primary accent */
+  --brand2:#f0803c;
+  --champ:#d8a648;         /* secondary accent — competition/champion/success */
+  --live:#4fb39a;          /* restrained live/verified */
+  --grad-fire:linear-gradient(135deg,#d8431f,#e8963e);
+  --grad-brand:linear-gradient(120deg,#e14e2a,#ef7a36 45%,#d8a648);
+  --glow-fire:0 10px 34px rgba(225,78,42,.28);
+}
+body{background:var(--bg)}
+body::before{background:radial-gradient(circle, rgba(225,78,42,.07), transparent 62%);filter:blur(70px)}
+body::after{background:radial-gradient(circle, rgba(90,100,140,.07), transparent 62%);filter:blur(70px)}
+#splash{background:#07080c}
+
+/* ---- SLICED WORDMARK — the new CREATEIT identity ---- */
+.wm{display:inline-flex;align-items:baseline;gap:.14em;font-family:var(--display);line-height:1}
+.wm-create{display:inline-block;background:linear-gradient(180deg,#ffffff 20%,#c3c9d6 90%);-webkit-background-clip:text;background-clip:text;color:transparent;
+  -webkit-mask-image:linear-gradient(112deg,#000 44.5%,transparent 46.2%,transparent 48.6%,#000 50.3%);
+  mask-image:linear-gradient(112deg,#000 44.5%,transparent 46.2%,transparent 48.6%,#000 50.3%)}
+.wm-it{display:inline-block;background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent;transform:translateY(-.06em);letter-spacing:.02em}
+.wordmark{letter-spacing:.08em}
+.wordmark .w-it{display:none}
+.brand .wordmark{display:none}
+.brand{gap:11px}
+.brand .wm{font-size:23px;letter-spacing:.08em}
+#railnav .brand .wm{font-size:25px}
+.auth-brand .wm{font-size:40px}
+
+/* ---- SPLASH: particles forming the word ---- */
+#splash .sp-word{position:relative;-webkit-mask-image:linear-gradient(112deg,#000 44.5%,transparent 46.2%,transparent 48.6%,#000 50.3%);
+  mask-image:linear-gradient(112deg,#000 44.5%,transparent 46.2%,transparent 48.6%,#000 50.3%)}
+#splash .sp-l{animation:sp-snap .48s cubic-bezier(.2,1.35,.35,1) both;animation-delay:calc(.3s + var(--i)*.038s)}
+#splash .sp-l.it{background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sp-parts{position:absolute;inset:0;pointer-events:none;overflow:visible}
+.sp-part{position:absolute;left:50%;top:44%;width:5px;height:5px;border-radius:2px;background:var(--brand2);opacity:0;
+  animation:sp-converge .62s cubic-bezier(.3,.6,.3,1) both;animation-delay:var(--d)}
+.sp-part.g{background:var(--champ);width:4px;height:4px}
+@keyframes sp-converge{
+  0%{opacity:0;transform:translate(var(--fx),var(--fy)) scale(.5)}
+  25%{opacity:.95}
+  100%{opacity:0;transform:translate(0,0) scale(.2)}
+}
+#splash .sp-rule{animation-delay:.78s}
+#splash .sp-tag{animation:sp-fade .4s ease .95s both}
+
+/* ---- VIDEO STATE MACHINE UI ---- */
+.vid-frame{position:relative;background:#000}
+.vid-ui{position:absolute;inset:0;pointer-events:none;z-index:4;display:flex;align-items:center;justify-content:center}
+.vid-loading{position:absolute;width:44px;height:44px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:var(--brand2);
+  animation:spin .8s linear infinite;opacity:0;transition:opacity .2s}
+.vid-loading.show{opacity:1}
+.vid-playbtn{position:absolute;width:70px;height:70px;border-radius:50%;background:rgba(10,12,17,.6);backdrop-filter:blur(8px);
+  border:1.5px solid rgba(255,255,255,.3);color:#fff;display:flex;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;
+  opacity:0;transform:scale(.85);transition:.22s cubic-bezier(.2,1,.3,1)}
+.vid-playbtn.show{opacity:1;transform:scale(1)}
+.vid-playbtn:hover{background:rgba(225,78,42,.75);border-color:transparent}
+.vid-error{position:absolute;display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--mut);font-size:13px;font-weight:600;
+  text-align:center;padding:16px;opacity:0;transition:opacity .2s}
+.vid-error.show{opacity:1}
+.vid-error .btn{pointer-events:auto}
+/* equalizer — visible proof of playback */
+.eq{display:inline-flex;align-items:flex-end;gap:2.5px;height:12px}
+.eq i{width:3px;border-radius:2px;background:var(--champ);height:30%;animation:eq-b 1s ease-in-out infinite;animation-play-state:paused}
+.vid-frame.is-playing ~ * .eq i,.is-playing .eq i,.eq.on i{animation-play-state:running}
+.eq i:nth-child(2){animation-delay:.22s}.eq i:nth-child(3){animation-delay:.44s}
+@keyframes eq-b{0%,100%{height:25%}50%{height:100%}}
+
+/* ---- EVENT HERO — Creator of the Week ---- */
+.event-frame{position:relative;border-radius:30px;padding:2px;overflow:hidden}
+.event-frame::before{content:"";position:absolute;left:50%;top:50%;width:230%;aspect-ratio:1;
+  transform:translate(-50%,-50%);
+  background:conic-gradient(transparent 0 68%, rgba(225,78,42,.75) 76%, rgba(216,166,72,.85) 83%, rgba(255,255,255,.35) 86%, transparent 93%);
+  animation:frame-spin 5.5s linear infinite}
+@keyframes frame-spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+.event-inner{position:relative;border-radius:28px;overflow:hidden;background:var(--bg2);z-index:1}
+.event-badge{display:inline-flex;align-items:center;gap:9px;font-size:10px;font-weight:800;letter-spacing:2.6px;color:#f4dfae;
+  background:linear-gradient(120deg,rgba(216,166,72,.18),rgba(216,166,72,.05));border:1px solid rgba(216,166,72,.4);
+  padding:8px 15px;border-radius:999px;text-transform:uppercase;backdrop-filter:blur(6px)}
+.hero-vid{aspect-ratio:16/8.6;min-height:300px;cursor:pointer}
+.hero-vid video{width:100%;height:100%;object-fit:cover}
+.hero-grad{position:absolute;inset:0;pointer-events:none;background:linear-gradient(to top,rgba(10,12,17,.9) 3%,rgba(10,12,17,.25) 32%,transparent 55%),linear-gradient(to right,rgba(10,12,17,.5),transparent 45%)}
+.hero-info{position:absolute;left:22px;right:22px;bottom:20px;z-index:5;display:flex;flex-direction:column;gap:9px;pointer-events:none}
+.hero-info>*{pointer-events:auto}
+.hi-kicker{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.hi-title{font-family:var(--display);font-size:clamp(30px,5.4vw,52px);letter-spacing:1.5px;line-height:1.05;text-shadow:0 8px 30px rgba(0,0,0,.6)}
+.hi-sub{display:flex;align-items:center;gap:14px;flex-wrap:wrap;color:#c6cbd6;font-size:13.5px}
+.hi-sub .eq{margin-left:2px}
+.hi-livechip{display:inline-flex;align-items:center;gap:8px;font-size:10.5px;font-weight:800;letter-spacing:1.8px;color:#dff3ec;
+  background:rgba(8,12,11,.6);border:1px solid rgba(79,179,154,.4);border-radius:999px;padding:6px 12px;backdrop-filter:blur(6px)}
+.event-stats{display:flex;gap:0;border-top:1px solid var(--line);background:rgba(14,17,23,.6)}
+.ev-stat{flex:1;padding:16px 12px;text-align:center;border-right:1px solid var(--line)}
+.ev-stat:last-child{border-right:none}
+.ev-stat .v{font-family:var(--display);font-size:clamp(20px,3vw,28px);letter-spacing:1px;color:var(--text)}
+.ev-stat .v.gold{color:var(--champ)}
+.ev-stat .k{font-size:9px;font-weight:800;letter-spacing:1.8px;color:var(--dim);text-transform:uppercase;margin-top:3px}
+.event-cta{display:flex;gap:10px;flex-wrap:wrap;padding:16px 20px 20px}
+@media (max-width:640px){.hero-vid{aspect-ratio:4/4.6;min-height:0}.hero-info{left:14px;right:14px;bottom:14px}}
+
+/* ---- BEAT IT BOARD ---- */
+.beat-board{background:linear-gradient(150deg,rgba(225,78,42,.10),rgba(20,24,34,.9) 46%,rgba(216,166,72,.06));
+  border:1px solid rgba(225,78,42,.3);border-radius:24px;padding:20px;position:relative;overflow:hidden}
+.beat-board::after{content:"";position:absolute;top:0;right:0;width:190px;height:190px;pointer-events:none;
+  background:radial-gradient(circle at 80% 20%, rgba(216,166,72,.14), transparent 65%)}
+.bb-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.bb-title{font-family:var(--display);font-size:clamp(20px,3.4vw,28px);letter-spacing:1.2px}
+.bb-code{font-size:10px;font-weight:800;letter-spacing:2px;color:var(--champ)}
+.bb-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:9px;margin:14px 0}
+.bb-stat{background:rgba(9,11,16,.6);border:1px solid var(--line);border-radius:14px;padding:11px 12px}
+.bb-stat .v{font-family:var(--display);font-size:17px;letter-spacing:.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bb-stat .v.g{color:var(--champ)}
+.bb-stat .k{font-size:8.5px;font-weight:800;letter-spacing:1.6px;color:var(--dim);text-transform:uppercase;margin-top:3px}
+
+/* ---- ARENA emblem v2 (ring + target + clash) ---- */
+.arena-emblem{width:112px;height:112px}
+.ae2-ring{stroke-dasharray:290;stroke-dashoffset:290;animation:ae-draw .9s cubic-bezier(.3,.7,.3,1) .15s forwards}
+.ae2-target{opacity:0;transform:scale(.6);transform-origin:center;animation:ae-pop .45s cubic-bezier(.2,1.3,.4,1) .7s forwards}
+.ae2-clash{stroke-dasharray:60;stroke-dashoffset:60;animation:ae-draw .5s ease .55s forwards}
+@keyframes ae-pop{to{opacity:1;transform:scale(1)}}
+.arena-head{background:linear-gradient(150deg,rgba(225,78,42,.09),rgba(16,20,28,.92) 45%,rgba(216,166,72,.05));border-color:var(--line2)}
+.arena-head h1{font-size:clamp(40px,7vw,62px)}
+
+/* ---- CHAMPION PLATE ---- */
+.champ-plate{position:relative;display:flex;align-items:center;gap:18px;flex-wrap:wrap;overflow:hidden;
+  background:linear-gradient(135deg,rgba(216,166,72,.16),rgba(216,166,72,.03) 60%);border:1px solid rgba(216,166,72,.5);border-radius:24px;padding:20px}
+.champ-plate .cp-crown{width:54px;height:54px;color:var(--champ);flex:none;filter:drop-shadow(0 6px 18px rgba(216,166,72,.5));animation:crown-float 3.4s ease-in-out infinite}
+.champ-plate::before{content:"";position:absolute;top:0;bottom:0;width:36%;left:-40%;transform:skewX(-16deg);
+  background:linear-gradient(100deg,transparent,rgba(216,166,72,.12),transparent);animation:cp-sheen 4.5s ease infinite}
+@keyframes cp-sheen{0%,55%{left:-40%}100%{left:115%}}
+.cp-label{font-size:9.5px;font-weight:800;letter-spacing:2.6px;color:var(--champ);text-transform:uppercase}
+.cp-name{font-family:var(--display);font-size:clamp(20px,3.4vw,28px);letter-spacing:1.2px}
+
+/* ---- 100% MOMENT STAMP ---- */
+.moment{position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.moment-card{display:flex;flex-direction:column;align-items:center;gap:8px;padding:26px 40px;border-radius:22px;
+  background:rgba(10,12,17,.88);backdrop-filter:blur(14px);border:1px solid rgba(216,166,72,.55);
+  box-shadow:0 30px 90px rgba(0,0,0,.6), 0 0 60px rgba(216,166,72,.18);
+  animation:moment-in 1.6s cubic-bezier(.2,1,.3,1) both}
+.moment-pct{font-family:var(--display);font-size:64px;letter-spacing:2px;background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent}
+.moment-txt{font-size:11px;font-weight:800;letter-spacing:3px;color:#e9d8ab;text-transform:uppercase}
+@keyframes moment-in{
+  0%{opacity:0;transform:scale(.72)}
+  14%{opacity:1;transform:scale(1.05)}
+  22%{transform:scale(1)}
+  80%{opacity:1}
+  100%{opacity:0;transform:scale(1.02) translateY(-8px)}
+}
+
+/* ---- CREATE button presence ---- */
+.bn-create{animation:bn-glow 3s ease-in-out infinite}
+@keyframes bn-glow{0%,100%{box-shadow:0 6px 22px rgba(225,78,42,.35), inset 0 1px 0 rgba(255,255,255,.3)}50%{box-shadow:0 6px 34px rgba(225,78,42,.6), inset 0 1px 0 rgba(255,255,255,.3)}}
+.rail-create{animation:bn-glow 3s ease-in-out infinite}
+
+/* ---- empty & error states ---- */
+.empty{position:relative;border-style:solid;border-color:var(--line);background:rgba(18,22,31,.5)}
+.empty .e-ico{display:block;color:var(--dim);margin-bottom:8px}
+.err-block{text-align:center;padding:44px 16px;color:var(--mut)}
+.err-block h3{font-family:var(--display);letter-spacing:1.4px;font-size:22px;color:var(--text);margin-bottom:6px}
+
+/* ---- discover additions ---- */
+.ds-follow{width:52px;height:44px;font-size:18px;font-weight:800}
+.ds-follow.on{color:var(--champ);border-color:rgba(216,166,72,.5)}
+
+/* ---- score badge refinement ---- */
+.score-badge{background:rgba(9,11,16,.8);border:1px solid var(--line)}
+.sc-beat{color:var(--champ);border-color:rgba(216,166,72,.4)}
+
+/* ---- journey timeline polish ---- */
+.j-row{background:rgba(18,22,31,.7)}
+.j-timeline::before{background:linear-gradient(to bottom,rgba(225,78,42,.55),rgba(216,166,72,.6))}
+
+/* ---- mature buttons ---- */
+.btn-fire{background:var(--grad-fire)}
+.chip.active{background:var(--grad-fire)}
+.st-tab.active{background:var(--grad-fire)}
+.pf-tab.active{background:var(--grad-fire)}
+.sp-wordwrap{position:relative;display:flex;justify-content:center}
+.sp-parts{position:absolute;inset:-40px -120px;pointer-events:none}
+.sp-pulsebar{position:absolute;top:-14%;bottom:-14%;width:34%;left:-40%;pointer-events:none;z-index:2;
+  background:linear-gradient(100deg,transparent,rgba(240,190,110,.28),rgba(255,255,255,.45),rgba(240,190,110,.28),transparent);
+  transform:skewX(-18deg);opacity:0;animation:sp-sweep2 .55s cubic-bezier(.4,.1,.3,1) .88s both}
+@keyframes sp-sweep2{0%{opacity:1;left:-40%}100%{opacity:0;left:112%}}
