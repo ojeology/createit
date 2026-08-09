@@ -641,6 +641,31 @@ async function viewHome() {
   <div class="quote">“Maybe I don't have millions of followers. Maybe I'm not famous.<br>But I have something that is <em>uniquely mine</em>.”</div>`;
 }
 
+function arenaCard(c) {
+  const pct = c.recreate_target ? Math.min(100, Math.round(c.recreate_count / c.recreate_target * 100)) : 0;
+  const left = Math.max(0, c.recreate_target - c.recreate_count);
+  const timeChip = c.stage === "recreate_it" && c.days_left != null ? `<span class="ar-time">${ic("clock", 12)} ${c.days_left}d left</span>` : "";
+  const enter = c.stage === "champion" ? `${ic("crown", 14)} VIEW RECORD` : c.stage === "beat_it" || c.stage === "recreate_closed" ? `${ic("zap", 14)} BEAT IT LIVE` : `${ic("zap", 14)} ENTER CHALLENGE`;
+  return `<div class="arena-card" data-nav="/challenge/${c.id}"><div class="card-glare"></div>
+    <div class="ar-thumb">${thumb(c.original_video)}<div class="veil"></div>
+      <div class="ar-toprow">${stagePill(c.stage)}${c.featured ? `<span class="pill-mini pm-gold">${ic("star", 10)} FEATURED</span>` : ""}${c.sponsor ? `<span class="pill-mini pm-gold">${esc(c.sponsor)} ×</span>` : ""}</div>
+      <div class="ar-bottom"><span class="ar-code">${esc(c.code)}</span><span class="ar-title">${esc(c.title)}</span></div>
+    </div>
+    <div class="ar-body">
+      <div class="ar-creator">${avatar(c.creator, "sm")} created by <b>@${esc(c.creator.username)}</b>${timeChip}</div>
+      <div class="ar-stats">
+        <div class="ars"><span class="ars-v">${c.top ? c.top.score + "%" : "—"}</span><span class="ars-k">Top score</span></div>
+        <div class="ars"><span class="ars-v">${c.top ? "@" + esc(c.top.user.username) : "—"}</span><span class="ars-k">Leader</span></div>
+        <div class="ars"><span class="ars-v">${c.participants}</span><span class="ars-k">Fighters</span></div>
+        <div class="ars"><span class="ars-v">${left.toLocaleString()}</span><span class="ars-k">Slots left</span></div>
+      </div>
+      <div class="progress-line"><span><b>${c.recreate_count.toLocaleString()}</b> / ${c.recreate_target.toLocaleString()} recreations</span></div>
+      <div class="progress ${c.stage === "champion" ? "t-gold" : ""}"><div style="width:${pct}%"></div></div>
+      <button class="btn btn-fire btn-block ar-enter">${enter}</button>
+    </div>
+  </div>`;
+}
+
 async function viewChallenges(query) {
   const [cdr, lbr, hdr] = await Promise.allSettled([api("/api/challenges"), api("/api/leaderboard"), api("/api/home")]);
   const cd = cdr.status === "fulfilled" ? cdr.value : { challenges: [] };
@@ -1075,7 +1100,7 @@ function discSlideHTML(v, i) {
     : v.kind === "beatit"
     ? `<span class="ds-kind">${ic("zap", 12)} BEAT IT · FINAL ${v.score != null ? `· <b>${v.score}%</b>` : ""}</span>`
     : `<span class="ds-kind">${ic("refresh", 12)} ATTEMPT #${v.attempt_no} ${v.score != null ? `· <b>${v.score}% MATCH</b>` : ""}</span>`;
-  return `<div class="disc-slide vid-frame" data-di="${i}" data-score="${v.score ?? ""}" data-vid="${v.id}">
+  return `<div class="disc-slide vid-frame" data-di="${i}" data-score="${v.score ?? ""}" data-vid="${v.id}" ${v.poster ? `style="background-image:url(${v.poster});background-size:contain;background-position:center;background-repeat:no-repeat"` : ""}>
     <video playsinline loop preload="none" muted ${v.poster ? `poster="${v.poster}"` : ""} data-dsrc="${v.src}"></video>
     <div class="disc-ctx">
       ${kind}
