@@ -119,6 +119,12 @@ def seed_if_empty():
     # demo sponsor: show the sponsored model in action (never overwrites real data)
     if not q1("SELECT 1 FROM challenges WHERE sponsor IS NOT NULL AND sponsor != ''"):
         q("UPDATE challenges SET sponsor='INDOMIE' WHERE id=3")
+    for stmt in ("ALTER TABLE videos ADD COLUMN views INTEGER DEFAULT 0",
+                 "ALTER TABLE users ADD COLUMN youtube TEXT DEFAULT ''",
+                 "ALTER TABLE users ADD COLUMN tiktok TEXT DEFAULT ''",
+                 "ALTER TABLE users ADD COLUMN instagram TEXT DEFAULT ''"):
+        try: q(stmt)
+        except sqlite3.OperationalError: pass
     commit()
     if q1("SELECT COUNT(*) c FROM users")["c"]:
         return
@@ -230,6 +236,9 @@ def user_pub(uid_or_row):
         "avatar": r["avatar"], "color": r["color"], "bio": r["bio"], "is_admin": bool(r["is_admin"]),
         "followers": q1("SELECT COUNT(*) c FROM follows WHERE followee_id=?", (r["id"],))["c"],
         "following": q1("SELECT COUNT(*) c FROM follows WHERE follower_id=?", (r["id"],))["c"],
+        "socials": {"youtube": (r["youtube"] or "") if "youtube" in r.keys() else "",
+                    "tiktok": (r["tiktok"] or "") if "tiktok" in r.keys() else "",
+                    "instagram": (r["instagram"] or "") if "instagram" in r.keys() else ""},
     }
 
 def video_pub(r, me=None):
@@ -240,6 +249,7 @@ def video_pub(r, me=None):
     return {
         "id": r["id"], "kind": r["kind"], "title": r["title"], "description": r["description"],
         "src": "/uploads/" + r["file"], "poster": poster, "status": r["status"], "score": r["score"],
+        "views": (r["views"] or 0) if "views" in r.keys() else 0,
         "attempt_no": r["attempt_no"], "nominated": bool(r["nominated"]), "created_at": r["created_at"],
         "owner": owner,
         "challenge": {"id": ch["id"], "code": ch["code"], "title": ch["title"], "stage": ch["stage"]} if ch else None,
@@ -256,6 +266,9 @@ def challenge_pub(r, me=None):
     orig = get_video(r["original_video_id"])
     participants = q1("SELECT COUNT(DISTINCT user_id) c FROM videos WHERE challenge_id=? AND kind='recreate'", (r["id"],))["c"]
     qualified = q1("SELECT COUNT(DISTINCT user_id) c FROM videos WHERE challenge_id=? AND kind='recreate' AND score>=100", (r["id"],))["c"]
+    attempts_total = q1("SELECT COUNT(*) c FROM videos WHERE challenge_id=? AND kind='recreate'", (r["id"],))["c"]
+    top_row = q1("SELECT user_id, MAX(score) s FROM videos WHERE challenge_id=? AND kind='recreate' AND score IS NOT NULL GROUP BY user_id ORDER BY s DESC LIMIT 1", (r["id"],))
+    top = {"user": user_pub(top_row["user_id"]), "score": top_row["s"]} if top_row else None
     champ = None
     if r["champion_id"]:
         champ = {"user": user_pub(r["champion_id"]), "score": r["champion_score"], "video_id": r["champion_video_id"],
@@ -274,7 +287,8 @@ def challenge_pub(r, me=None):
         "id": r["id"], "code": r["code"], "title": r["title"], "description": r["description"],
         "stage": r["stage"], "recreate_target": r["recreate_target"], "recreate_count": r["recreate_count"],
         "featured": bool(r["featured"]), "participants": participants, "qualified": qualified,
-        "days_left": days_left, "created_at": r["created_at"],
+        "days_left": days_left, "created_at": r["created_at"], "closes_at": r["closes_at"],
+        "attempts_total": attempts_total, "top": top,
         "sponsor": (r["sponsor"] if "sponsor" in r.keys() else None),
         "creator": creator, "original_video": video_pub(orig, me) if orig else None, "champion": champ,
         "mine": mine,
@@ -349,7 +363,7 @@ def home():
     hero_feed = []
     if feat:
         hero_feed = [video_pub(r, me) for r in qa(
-            "SELECT * FROM videos WHERE challenge_id=? AND kind='recreate' AND status='approved' AND score>=100 ORDER BY id DESC LIMIT 10", (feat["id"],))]
+            "SELECT * FROM videos WHERE challenge_id=? AND kind='recreate' AND status='approved' ORDER BY (score IS NULL), id DESC LIMIT 12", (feat["id"],))]
     feed_create = [video_pub(r, me) for r in qa(
         "SELECT * FROM videos WHERE kind='creation' AND status='approved' ORDER BY id DESC LIMIT 10")]
     feed_recreate = [video_pub(r, me) for r in qa(
@@ -392,6 +406,7 @@ def video_detail(vid):
     me = current_user()
     r = get_video(vid)
     if not r: return jsonify(error="Not found"), 404
+    q("UPDATE videos SET views=COALESCE(views,0)+1 WHERE id=?", (vid,)); commit(); r = get_video(vid)
     cs = qa("SELECT c.*, u.username FROM comments c JOIN users u ON u.id=c.user_id WHERE video_id=? ORDER BY c.id DESC LIMIT 50", (vid,))
     comments = [{"id": c["id"], "text": c["text"], "username": c["username"], "created_at": c["created_at"]} for c in cs]
     return jsonify(video=video_pub(r, me), comments=comments)
@@ -467,10 +482,41 @@ def profile(username):
             "won": ch["champion_id"] == u["id"],
         })
     creation_list = [video_pub(r, me) for r in qa("SELECT * FROM videos WHERE user_id=? AND kind='creation' ORDER BY id DESC", (u["id"],))]
+    uploads = [video_pub(r, me) for r in qa("SELECT * FROM videos WHERE user_id=? ORDER BY id DESC", (u["id"],))]
+    attempts = [video_pub(r, me) for r in qa("SELECT * FROM videos WHERE user_id=? AND kind='recreate' ORDER BY id DESC LIMIT 60", (u["id"],))]
+    records = [{"challenge": {"id": c["id"], "code": c["code"], "title": c["title"]}, "score": c["champion_score"],
+                "unbeaten_days": days_ago(c["champion_at"])} for c in qa("SELECT * FROM challenges WHERE champion_id=? ORDER BY champion_at DESC", (u["id"],))]
     return jsonify(user=pub, stats={"champion": len(champs), "completed": completed, "attempts": attempts,
                                      "creations": creations, "beatit": beatit},
                    champion_of=[{"id": c["id"], "code": c["code"], "title": c["title"], "score": c["champion_score"]} for c in champs],
-                   journeys=journeys, creations=creation_list)
+                   journeys=journeys, creations=creation_list, uploads=uploads, attempts=attempts, records=records)
+
+@app.post("/api/user/socials")
+@require_user
+def socials_update(u):
+    d = request.get_json(silent=True) or {}
+    yt = (d.get("youtube") or "").strip()[:160]
+    tk = (d.get("tiktok") or "").strip()[:160]
+    ig = (d.get("instagram") or "").strip()[:160]
+    try:
+        q("UPDATE users SET youtube=?, tiktok=?, instagram=? WHERE id=?", (yt, tk, ig, u["id"]))
+    except sqlite3.OperationalError:
+        return jsonify(error="Socials not available yet"), 400
+    commit()
+    return jsonify(ok=True)
+
+# ---------------------------------------------------------------- journey
+@app.get("/api/journey/<int:cid>/<int:uid>")
+def journey(cid, uid):
+    me = current_user()
+    ch = get_challenge(cid)
+    u = q1("SELECT * FROM users WHERE id=?", (uid,))
+    if not ch or not u: return jsonify(error="Not found"), 404
+    attempts = [video_pub(r, me) for r in qa(
+        "SELECT * FROM videos WHERE challenge_id=? AND user_id=? AND kind='recreate' ORDER BY attempt_no", (cid, uid))]
+    beatit = q1("SELECT * FROM videos WHERE challenge_id=? AND user_id=? AND kind='beatit'", (cid, uid))
+    return jsonify(user=user_pub(u), challenge=challenge_pub(ch, me), attempts=attempts,
+                   beatit=video_pub(beatit, me) if beatit else None)
 
 # ---------------------------------------------------------------- notifications
 @app.get("/api/notifications")
@@ -644,10 +690,13 @@ def admin_stage(u):
     ch = get_challenge(d.get("challenge_id", 0))
     if not ch: return jsonify(error="Not found"), 404
     stage = d.get("stage")
-    if stage not in STAGES: return jsonify(error="Bad stage"), 400
-    q("UPDATE challenges SET stage=? WHERE id=?", (stage, ch["id"]))
+    if stage:
+        if stage not in STAGES: return jsonify(error="Bad stage"), 400
+        q("UPDATE challenges SET stage=? WHERE id=?", (stage, ch["id"]))
     if d.get("recreate_target"):
         q("UPDATE challenges SET recreate_target=? WHERE id=?", (int(d["recreate_target"]), ch["id"]))
+    if d.get("closes_at"):
+        q("UPDATE challenges SET closes_at=? WHERE id=?", (d["closes_at"] + "T23:59:59Z", ch["id"]))
     if stage == "beat_it":
         for row in qa("SELECT DISTINCT user_id FROM videos WHERE challenge_id=? AND kind='recreate' AND score>=100", (ch["id"],)):
             notify(row["user_id"], "stage", f"{ch['code']} entered BEAT IT. You are qualified — ONE FINAL SUBMISSION.", f"/challenge/{ch['id']}")
