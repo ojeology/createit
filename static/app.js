@@ -8,13 +8,28 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+const _apiCache = new Map();
+const CACHE_TTL = 20000;
+function invalidateCache() { _apiCache.clear(); }
 async function api(path, opts = {}) {
   const o = { headers: {}, ...opts };
+  const isGet = !o.method || o.method === "GET";
   if (o.json !== undefined) { o.headers["Content-Type"] = "application/json"; o.body = JSON.stringify(o.json); delete o.json; }
+  if (!isGet) {
+    const r = await fetch(path, o);
+    let data = {};
+    try { data = await r.json(); } catch (e) {}
+    if (!r.ok) throw new Error(data.error || "Something went wrong");
+    invalidateCache();
+    return data;
+  }
+  const hit = _apiCache.get(path);
+  if (hit && Date.now() - hit.t < CACHE_TTL) return hit.d;
   const r = await fetch(path, o);
   let data = {};
   try { data = await r.json(); } catch (e) {}
   if (!r.ok) throw new Error(data.error || "Something went wrong");
+  _apiCache.set(path, { d: data, t: Date.now() });
   return data;
 }
 
@@ -43,10 +58,7 @@ const STAGE_META = {
   beat_it:         { label: "BEAT IT",         icon: "⚔️" },
   champion:        { label: "CHAMPION",        icon: "👑" },
 };
-const stagePill = st => {
-  const dot = st === "recreate_it" ? `<span class="live-dot"></span>` : st === "champion" ? `<span class="live-dot gold"></span>` : "";
-  return `<span class="pill st-${st}">${dot}${STAGE_META[st].label}</span>`;
-};
+const stagePill = st => `<span class="pill st-${st}"><span class="pd"></span>${STAGE_META[st].label}</span>`;
 
 function scoreBadge(score) {
   if (score === null || score === undefined) return `<span class="pill-mini pm-dim">AWAITING SCORE</span>`;
@@ -144,10 +156,11 @@ function ic(name, size = 16, cls = "") {
   const dismiss = () => {
     if (done) return; done = true;
     s.classList.add("sp-exit");
-    setTimeout(() => s.remove(), 700);
+    setTimeout(() => s.remove(), 500);
   };
   s.addEventListener("click", dismiss);
-  setTimeout(dismiss, 3300);
+  const fast = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  setTimeout(dismiss, fast ? 250 : 1150);
 })();
 
 // ---------------- scroll reveals + count-ups ----------------
@@ -195,7 +208,7 @@ function renderChrome() {
     { ico: "home", label: "HOME", path: "/" },
     { ico: "flame", label: "ARENA", path: "/challenges" },
     { ico: "plus", label: "CREATE", path: "/create", special: true },
-    { ico: "trophy", label: "RANKS", path: "/leaderboard" },
+    { ico: "eye", label: "DISCOVER", path: "/discover" },
     { ico: "user", label: "PROFILE", path: ME ? "/user/" + ME.username : "/login" },
   ];
   const route = location.hash.slice(1).split("?")[0] || "/";
@@ -215,6 +228,7 @@ function renderChrome() {
     <button class="rail-item ${route === "/" ? "active" : ""}" data-nav="/"><span class="ico">${ic("home", 18)}</span>Home</button>
     <button class="rail-item ${route.startsWith("/challenges") ? "active" : ""}" data-nav="/challenges"><span class="ico">${ic("flame", 18)}</span>Arena</button>
     <button class="rail-item rail-create" data-nav="/create"><span class="ico">${ic("plus", 18)}</span>Create</button>
+    <button class="rail-item ${route.startsWith("/discover") ? "active" : ""}" data-nav="/discover"><span class="ico">${ic("eye", 18)}</span>Discover</button>
     <button class="rail-item ${route.startsWith("/leaderboard") ? "active" : ""}" data-nav="/leaderboard"><span class="ico">${ic("trophy", 18)}</span>Ranks</button>
     <button class="rail-item ${route.startsWith("/notifications") ? "active" : ""}" data-nav="/notifications"><span class="ico">${ic("bell", 18)}</span>Notifications${unread ? ` <span class="dot-badge" style="position:static;margin-left:4px">${unread}</span>` : ""}</button>
     ${ME?.is_admin ? `<button class="rail-item ${route.startsWith("/admin") ? "active" : ""}" data-nav="/admin"><span class="ico">${ic("shield", 18)}</span>Admin</button>` : ""}
@@ -385,7 +399,7 @@ document.addEventListener("click", async e => {
       if (v) { v.muted = !v.muted; el.innerHTML = ic(v.muted ? "volumeX" : "volume2", 16); el.classList.toggle("on", !v.muted); }
     }
     else if (act === "close-player") closePlayer();
-    else if (act === "share") { try { await navigator.clipboard.writeText(location.origin + "/#/video/" + PLAYER_VID); } catch (err) {} toast("Link copied — share the journey."); }
+    else if (act === "share") { try { await navigator.clipboard.writeText(location.origin + "/#/video/" + (el.dataset.vid || PLAYER_VID)); } catch (err) {} toast("Link copied — share the journey."); }
     else if (act === "like") {
       if (!ME) { location.hash = "/login"; return; }
       const d = await api(`/api/video/${vid}/like`, { method: "POST" });
@@ -605,11 +619,31 @@ async function viewChallenges(query) {
   const beat = all.filter(c => c.stage === "beat_it" || c.stage === "recreate_closed");
   const champs = all.filter(c => c.stage === "champion");
   const rec = n => `<span class="sec-n">${n}</span>`;
+  const totalFighters = all.reduce((a, c) => a + c.participants, 0);
+  const emblem = `<svg viewBox="0 0 120 120" fill="none" aria-hidden="true">
+    <defs><linearGradient id="aeg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#D94322"/><stop offset="1" stop-color="#E0A83F"/></linearGradient></defs>
+    <circle class="ae-pulse" cx="60" cy="60" r="48" stroke="#D94322" stroke-width="1.5"/>
+    <circle class="ae-ring" cx="60" cy="60" r="48" stroke="url(#aeg)" stroke-width="2.5" stroke-linecap="round" transform="rotate(-90 60 60)"/>
+    <g class="ae-swords" stroke="url(#aeg)" stroke-width="4.5" stroke-linecap="round">
+      <path d="M44 76 76 44"/><path d="M44 44 76 76"/>
+      <path d="M47 79l4.5-4.5M73 79l-4.5-4.5" stroke-width="3"/>
+    </g>
+    <path class="ae-core" d="M60 15l2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" fill="#E0A83F"/>
+  </svg>`;
   return `
   <div class="arena-head">
-    <div class="ah-tag">${ic("flame", 13)} COMPETITION CENTER · ${all.length} CHALLENGES</div>
-    <h1>THE ARENA</h1>
-    <p>These are the things people are trying to recreate and beat. Pick your fight.</p>
+    <div class="arena-emblem">${emblem}</div>
+    <div class="ah-mid">
+      <div class="ah-tag ah-live"><span class="live-dot"></span> COMPETITION CENTER · ${live.length} LIVE NOW</div>
+      <h1>THE ARENA</h1>
+      <p>These are the things people are trying to recreate and beat. Pick your fight.</p>
+      <div class="ah-stats">
+        <div class="ah-stat"><span class="hv" data-count="${all.length}">0</span><span class="hk">Challenges</span></div>
+        <div class="ah-stat"><span class="hv" data-count="${totalFighters}">0</span><span class="hk">Fighters</span></div>
+        <div class="ah-stat"><span class="hv" data-count="${lb.records.length}">0</span><span class="hk">Records</span></div>
+        <div class="ah-stat"><span class="hv" data-count="${champs.length}">0</span><span class="hk">Champions</span></div>
+      </div>
+    </div>
   </div>
 
   <div class="sec">${rec("01")}<h2><span class="live-dot"></span> LIVE NOW</h2><span class="sub">accepting recreations</span><span class="sec-rule"></span></div>
@@ -996,6 +1030,84 @@ async function viewProfile(username) {
   <div id="prof-area" class="prof-area">${profTabHTML("creations")}</div>`;
 }
 
+// ---------------- DISCOVER: immersive vertical feed ----------------
+const DISC = { muted: true };
+function discSlideHTML(v, i) {
+  const ch = v.challenge;
+  const kind = v.kind === "creation"
+    ? `<span class="ds-kind">${ic("spark", 12)} ORIGINAL CREATION${!ch ? " · POTENTIAL CHALLENGE" : ""}</span>`
+    : v.kind === "beatit"
+    ? `<span class="ds-kind">${ic("zap", 12)} BEAT IT · FINAL ${v.score != null ? `· <b>${v.score}%</b>` : ""}</span>`
+    : `<span class="ds-kind">${ic("refresh", 12)} ATTEMPT #${v.attempt_no} ${v.score != null ? `· <b>${v.score}% MATCH</b>` : ""}</span>`;
+  return `<div class="disc-slide" data-di="${i}">
+    <video playsinline loop preload="none" muted ${v.poster ? `poster="${v.poster}"` : ""} data-dsrc="${v.src}"></video>
+    <div class="disc-ctr">${ic("play", 24)}</div>
+    <div class="disc-ctx">
+      ${kind}
+      <div class="ds-owner" data-nav="/user/${v.owner.username}">${avatar(v.owner, "sm")} @${esc(v.owner.username)}</div>
+      ${ch ? `<div class="ds-act">
+        <button class="btn btn-sm" data-nav="/challenge/${ch.id}">${esc(ch.code)} ${ic("arrow", 12)}</button>
+        ${ch.stage === "recreate_it" ? `<button class="btn btn-sm btn-fire" data-nav="/create?kind=recreate&challenge=${ch.id}">${ic("zap", 12)} ATTEMPT</button>` : ""}
+      </div>` : ""}
+    </div>
+    <div class="disc-rail">
+      <button class="rail-act ${v.liked ? "on" : ""}" data-act="like" data-vid="${v.id}">${ic("heart", 22)}<span>${v.likes}</span></button>
+      <button class="rail-act" data-act="open-video" data-vid="${v.id}">${ic("chat", 22)}<span>${v.comments}</span></button>
+      <button class="rail-act" data-act="share" data-vid="${v.id}">${ic("share", 20)}</button>
+    </div>
+  </div>`;
+}
+function discActivate(i) {
+  const slides = $$(".disc-slide");
+  slides.forEach((sl, j) => {
+    const vid = sl.querySelector("video");
+    if (!vid) return;
+    if (Math.abs(j - i) <= 1) {
+      if (!vid.src && vid.dataset.dsrc) vid.src = vid.dataset.dsrc;
+      if (j === i) { vid.muted = DISC.muted; vid.play().catch(() => {}); }
+      else vid.pause();
+    } else if (vid.src) { vid.pause(); vid.removeAttribute("src"); vid.load(); }
+  });
+}
+function setupDisc() {
+  const feed = $("#disc-feed");
+  if (!feed || feed.dataset.ready) return;
+  feed.dataset.ready = "1";
+  const io = new IntersectionObserver(es => {
+    es.forEach(en => { if (en.isIntersecting && en.intersectionRatio >= 0.6) discActivate(+en.target.dataset.di); });
+  }, { root: feed, threshold: [0.6] });
+  $$(".disc-slide", feed).forEach(sl => io.observe(sl));
+  discActivate(0);
+  feed.addEventListener("click", e => {
+    if (e.target.closest("button,[data-nav],a")) return;
+    const sl = e.target.closest(".disc-slide");
+    const vid = sl && sl.querySelector("video");
+    if (!vid || !vid.src) return;
+    const ctr = sl.querySelector(".disc-ctr");
+    if (DISC.muted) { DISC.muted = false; vid.muted = false; }
+    else if (!vid.paused) { vid.pause(); ctr.classList.add("show"); }
+    else { vid.play(); ctr.classList.remove("show"); }
+  });
+}
+async function viewDiscover(query) {
+  const filter = query.get("f") || "trending";
+  const filters = [["trending", "TRENDING"], ["new", "NEW"], ["challenges", "CHALLENGES"], ["originals", "ORIGINALS"], ["champions", "CHAMPIONS"]];
+  const shell = `<div class="disc-stage">
+    <div class="disc-top">
+      <button class="icon-btn dt-close" data-nav="/" title="Back">${ic("arrow", 17)}</button>
+      ${filters.map(([k, l]) => `<button class="chip ${k === filter ? "active" : ""}" data-nav="/discover?f=${k}">${l}</button>`).join("")}
+    </div>
+    <div class="disc-feed" id="disc-feed"><div class="disc-load">LOADING DISCOVER…</div></div>
+  </div>`;
+  api(`/api/discover?filter=${encodeURIComponent(filter)}&limit=30`).then(d => {
+    const feed = $("#disc-feed");
+    if (!feed) return;
+    feed.innerHTML = d.videos.length ? d.videos.map((v, i) => discSlideHTML(v, i)).join("") : `<div class="disc-load">NOTHING HERE YET — BE THE FIRST TO CREATE</div>`;
+    setupDisc();
+  }).catch(() => { const feed = $("#disc-feed"); if (feed) feed.innerHTML = `<div class="disc-load">COULD NOT LOAD — TRY AGAIN</div>`; });
+  return shell;
+}
+
 // ---------------- attempt journey timeline ----------------
 async function viewJourney(cid, uid) {
   const d = await api(`/api/journey/${cid}/${uid}`);
@@ -1279,12 +1391,17 @@ async function route() {
   const query = new URLSearchParams(qs || "");
   const app = $("#app");
   window.scrollTo(0, 0);
-  app.innerHTML = `<div class="loading">${logoSVG(38)}<div class="spinner"></div><p>LOADING…</p></div>`;
+  const isHome = path === "/" || path === "";
+  app.innerHTML = isHome
+    ? `<div class="skel skel-hero"></div><div class="skel-row"><div class="skel skel-card"></div><div class="skel skel-card"></div><div class="skel skel-card"></div></div>`
+    : `<div class="loading">${logoSVG(38)}<div class="spinner"></div><p>LOADING…</p></div>`;
   renderChrome();
   try {
     let html;
     const parts = path.split("/").filter(Boolean);
-    if (parts.length === 3 && parts[0] === "journey") {
+    if (parts.length === 1 && parts[0] === "discover") {
+      html = await viewDiscover(query);
+    } else if (parts.length === 3 && parts[0] === "journey") {
       html = await viewJourney(parts[1], parts[2]);
     } else if (parts.length === 2 && VIEWS["/" + parts[0]]) {
       html = await VIEWS["/" + parts[0]](decodeURIComponent(parts[1]), query);
