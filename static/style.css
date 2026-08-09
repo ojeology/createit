@@ -569,3 +569,92 @@ select.mini, .mini-btn{padding:8px 12px;border-radius:10px;background:var(--surf
   .dk-btn{display:none}
   .deck-card{width:86vw}
 }
+
+/* ============================================================
+   v5 — MATURE: deeper blacks, champagne-fire, animated logo,
+   editorial cards, stage takeover tabs
+   ============================================================ */
+:root{
+  --bg:#030408; --bg2:#05070c; --surface:rgba(13,16,24,.8); --surface2:#111420; --surface3:#191d2a;
+  --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.14);
+  --text:#eef1f6; --mut:#828b9e; --dim:#525a6b;
+  --fire1:#d94322; --fire2:#e0a83f; --fire-mid:#cf7434;
+  --violet:#6f63d8; --teal:#2aa88e; --gold:#d8ab4e; --blue:#6d89c9; --pink:#c97d9a; --ice:#8fb8d8;
+  --grad-fire:linear-gradient(135deg,#c93d1e,#e0a83f);
+  --grad-brand:linear-gradient(120deg,#d94322,#cf7434 45%,#e0a83f);
+  --glow-fire:0 8px 30px rgba(217,67,34,.3);
+}
+body::before{background:radial-gradient(circle, rgba(217,67,34,.11), transparent 62%)}
+body::after{background:radial-gradient(circle, rgba(111,99,216,.09), transparent 62%)}
+#splash{background:#020307}
+#topbar{background:rgba(3,4,8,.82)}
+#bottomnav{background:rgba(4,5,10,.92)}
+#railnav{background:rgba(4,5,10,.88)}
+
+/* stage pills — mature */
+.st-create_it{background:rgba(111,99,216,.14);color:#9e94e6;border-color:rgba(111,99,216,.35)}
+.st-recreate_it{background:rgba(42,168,142,.12);color:#6cc7b2;border-color:rgba(42,168,142,.35)}
+.st-recreate_closed{background:rgba(201,125,154,.12);color:#d8a3b8;border-color:rgba(201,125,154,.35)}
+.st-beat_it{background:rgba(217,67,34,.14);color:#e08a6a;border-color:rgba(217,67,34,.4)}
+.st-champion{background:rgba(216,171,78,.12);color:#d8ab4e;border-color:rgba(216,171,78,.4)}
+.sc-full{color:#4ac7a4}.sc-beat{color:#d8ab4e}
+.pm-gold{background:rgba(216,171,78,.14);color:#d8ab4e}
+.pm-fire{background:rgba(217,67,34,.16);color:#e08a6a}
+.pm-teal{background:rgba(42,168,142,.14);color:#6cc7b2}
+.pm-violet{background:rgba(111,99,216,.16);color:#9e94e6}
+.live-dot{background:#4ac7a4}
+.live-dot::after{border-color:rgba(74,199,164,.5)}
+.live-dot.gold{background:#d8ab4e}.live-dot.gold::after{border-color:rgba(216,171,78,.5)}
+.hero-title{background:linear-gradient(90deg,#fff 30%,#e8c893 50%,#fff 70%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent}
+.ch-code{color:#d8ab4e}
+.week-ribbon{border-color:rgba(216,171,78,.4)}
+.week-ribbon .wr-1{color:#d8ab4e}
+.hero-kicker{color:#e8c893;border-color:rgba(216,171,78,.32)}
+.records-card .rc-score{color:#d8ab4e;text-shadow:0 0 18px rgba(216,171,78,.3)}
+.board-row:nth-child(1) .rank{color:#d8ab4e}
+.stat-box.gold .v{color:#d8ab4e;text-shadow:0 0 20px rgba(216,171,78,.35)}
+.champ-banner{background:linear-gradient(135deg,rgba(216,171,78,.13),rgba(216,171,78,.02));border-color:rgba(216,171,78,.4)}
+.champ-banner h3{color:#d8ab4e}
+.ch-sponsor{color:#d8ab4e;background:linear-gradient(90deg,rgba(216,171,78,.14),rgba(216,171,78,.03));border-color:rgba(216,171,78,.32)}
+
+/* mature challenge card — editorial poster */
+.ch-card{border-radius:16px;border-color:rgba(255,255,255,.07);background:rgba(12,15,23,.82)}
+.ch-card:hover{border-color:rgba(216,171,78,.42);box-shadow:0 20px 48px rgba(0,0,0,.6)}
+.ch-thumb{aspect-ratio:16/11}
+.ch-title{font-size:20px;letter-spacing:1.2px}
+.deck-card .ch-thumb{aspect-ratio:16/11.5}
+.deck-card .ch-title{font-size:25px}
+.v-card{border-radius:16px;border-color:rgba(255,255,255,.07);background:rgba(12,15,23,.82)}
+.records-card{border-radius:16px;background:rgba(12,15,23,.82)}
+
+/* animated logo */
+.logo-mark{transition:transform .8s cubic-bezier(.3,.7,.2,1)}
+.brand:hover .logo-mark{transform:rotate(360deg)}
+.logo-mark .lm-spark{transform-box:fill-box;transform-origin:center;animation:spark-life 5s ease-in-out infinite}
+@keyframes spark-life{0%,100%{transform:rotate(0) scale(1);opacity:1}50%{transform:rotate(18deg) scale(1.16);opacity:.85}}
+.loading .logo-mark{animation:slow-rot 2.8s linear infinite}
+@keyframes slow-rot{to{transform:rotate(360deg)}}
+#splash .sp-logo{animation:sp-logo-spin 1.2s cubic-bezier(.25,1.15,.35,1) .12s both;filter:drop-shadow(0 10px 40px rgba(217,67,34,.5))}
+@keyframes sp-logo-spin{from{opacity:0;transform:rotate(-320deg) scale(.15)}to{opacity:1;transform:rotate(0) scale(1)}}
+#splash .sp-l.it{background:var(--grad-brand);-webkit-background-clip:text;background-clip:text}
+
+/* stage takeover tabs */
+.stage-tabs{display:flex;gap:10px;margin:8px 0 18px}
+.st-tab{flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:15px 18px 17px;border-radius:16px;
+  background:rgba(12,15,23,.8);border:1px solid var(--line);color:var(--mut);transition:.22s;position:relative;overflow:hidden;text-align:left}
+.st-tab:hover{border-color:var(--line2)}
+.st-tab .st-num{font-size:9.5px;letter-spacing:2.2px;font-weight:800;color:var(--dim)}
+.st-tab .st-name{font-family:var(--display);font-size:clamp(17px,2.5vw,25px);letter-spacing:1.5px;color:#79819a;transition:.2s;line-height:1.15}
+.st-tab .st-sub{font-size:10.5px;font-weight:600;letter-spacing:.4px;color:var(--dim)}
+.st-tab.active{background:linear-gradient(150deg,rgba(217,67,34,.15),rgba(224,168,63,.04));border-color:rgba(224,168,63,.45);box-shadow:0 14px 38px rgba(0,0,0,.45)}
+.st-tab.active .st-name{background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent}
+.st-tab.active .st-sub{color:var(--mut)}
+.st-tab.active::after{content:"";position:absolute;left:18px;right:18px;bottom:9px;height:3px;border-radius:3px;background:var(--grad-fire);box-shadow:0 2px 12px rgba(217,67,34,.5)}
+.stage-area{animation:stagefade .45s cubic-bezier(.2,.7,.3,1)}
+@keyframes stagefade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@media (max-width:640px){
+  .stage-tabs{flex-direction:column}
+  .st-tab{flex-direction:row;align-items:center;gap:12px;padding:13px 16px}
+  .st-tab .st-name{flex:1}
+  .st-tab.active::after{left:16px;width:40px;right:auto}
+}

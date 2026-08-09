@@ -81,7 +81,7 @@ function logoSVG(size = 28) {
     <path d="M22 80 33 52" stroke="url(#${id})" stroke-width="10" stroke-linecap="round" opacity=".5"/>
     <path d="M38 82 53 42" stroke="url(#${id})" stroke-width="10" stroke-linecap="round" opacity=".8"/>
     <path d="M54 84 73 24" stroke="url(#${id})" stroke-width="11" stroke-linecap="round"/>
-    <path d="M77 5l3.2 8.8L89 17l-8.8 3.2L77 29l-3.2-8.8L65 17l8.8-3.2z" fill="#FFC42E"/>
+    <path class="lm-spark" d="M77 5l3.2 8.8L89 17l-8.8 3.2L77 29l-3.2-8.8L65 17l8.8-3.2z" fill="#E0A83F"/>
   </svg>`;
 }
 const brandHTML = (size = 26) => `<span class="brand">${logoSVG(size)}<span class="wordmark">CREATE<span class="w-it">IT</span></span></span>`;
@@ -356,6 +356,18 @@ document.addEventListener("click", async e => {
   const vid = el.dataset.vid;
   try {
     if (act === "watch" || act === "open-video") { e.stopPropagation(); openPlayer(vid); }
+    else if (act === "stage-tab") {
+      if (!HOME_DATA) return;
+      $$(".st-tab").forEach(t => t.classList.toggle("active", t === el));
+      const area = $("#stage-feed-area");
+      const vids = HOME_DATA[el.dataset.feed] || [];
+      area.classList.remove("stage-area"); void area.offsetWidth;
+      area.innerHTML = vids.length
+        ? `<div class="grid3">${vids.map(v => videoCard(v)).join("")}</div>`
+        : `<div class="empty">${el.dataset.empty}</div>`;
+      area.classList.add("stage-area");
+      runCountUps(); bindTilt();
+    }
     else if (act === "hero-sound") {
       const v = $("#hero-video");
       if (v) { v.muted = !v.muted; el.innerHTML = ic(v.muted ? "volumeX" : "volume2", 16); el.classList.toggle("on", !v.muted); }
@@ -430,8 +442,10 @@ const recordCard = c => `<div class="records-card">
   <button class="btn btn-sm" data-nav="/challenge/${c.id}">VIEW ${ic("arrow", 12)}</button></div>
 </div>`;
 
+let HOME_DATA = null;
 async function viewHome() {
   const d = await api("/api/home");
+  HOME_DATA = d;
   const h = d.hero;
   return `
   <div class="loop-strip">
@@ -482,19 +496,23 @@ async function viewHome() {
   ${secHead(d.sponsored.length ? "03" : "02", "flame", "LIVE CHALLENGES", "swipe through the arena", ["See all", "#/challenges"])}
   ${d.live.length ? deckOf(d.live, c => `<div class="deck-card">${challengeCard(c)}</div>`) : `<div class="empty">Nothing live right now.</div>`}
 
-  ${secHead("04", "film", "CREATE IT", "fresh originals — tomorrow's benchmarks")}
-  ${d.feed_create.length ? `<div class="grid3">${d.feed_create.map(v => videoCard(v)).join("")}</div>` : `<div class="empty">Scouts are watching. Upload something uniquely yours.</div>`}
-
-  ${secHead("05", "refresh", "RECREATE IT", "the most recent attempts from the community")}
-  ${d.feed_recreate.length ? `<div class="grid3">${d.feed_recreate.map(v => videoCard(v)).join("")}</div>` : `<div class="empty">Nobody has attempted yet. Be first.</div>`}
-
-  ${secHead("06", "zap", "BEAT IT", "final submissions — one shot to surpass the original")}
-  ${d.feed_beatit.length ? `<div class="grid3">${d.feed_beatit.map(v => videoCard(v)).join("")}</div>` : `<div class="empty">No final submissions yet — qualify at 100% first.</div>`}
+  ${secHead("04", "film", "THE STAGE", "pick a lane — the latest from each side of the arena")}
+  <div class="stage-tabs">
+    <button class="st-tab active" data-act="stage-tab" data-feed="feed_create" data-empty="Scouts are watching. Upload something uniquely yours.">
+      <span class="st-num">STAGE 1</span><span class="st-name">CREATE IT</span><span class="st-sub">the originals — tomorrow's benchmarks</span></button>
+    <button class="st-tab" data-act="stage-tab" data-feed="feed_recreate" data-empty="No verified recreations yet — 100% scores only appear here.">
+      <span class="st-num">STAGE 2</span><span class="st-name">RECREATE IT</span><span class="st-sub">verified 100% recreations only</span></button>
+    <button class="st-tab" data-act="stage-tab" data-feed="feed_beatit" data-empty="No final submissions yet — qualify at 100% first.">
+      <span class="st-num">STAGE 3</span><span class="st-name">BEAT IT</span><span class="st-sub">one final shot to surpass the original</span></button>
+  </div>
+  <div id="stage-feed-area" class="stage-area">
+    ${d.feed_create.length ? `<div class="grid3">${d.feed_create.map(v => videoCard(v)).join("")}</div>` : `<div class="empty">Scouts are watching. Upload something uniquely yours.</div>`}
+  </div>
 
   ${d.champions.length ? `
-  ${secHead("07", "disc", "UNBEATEN RECORDS", "nobody has broken these marks yet")}
+  ${secHead("05", "disc", "UNBEATEN RECORDS", "nobody has broken these marks yet")}
   <div class="records-grid">${d.champions.map(recordCard).join("")}</div>
-  ${secHead("08", "crown", "CHAMPIONS", "", ["Full ranks", "#/leaderboard"])}
+  ${secHead("06", "crown", "CHAMPIONS", "", ["Full ranks", "#/leaderboard"])}
   <div class="hscroll">${d.champions.map(challengeCard).join("")}</div>` : ""}
 
   <div class="quote">“Maybe I don't have millions of followers. Maybe I'm not famous.<br>But I have something that is <em>uniquely mine</em>.”</div>`;

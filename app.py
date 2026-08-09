@@ -347,11 +347,11 @@ def home():
     hero_feed = []
     if feat:
         hero_feed = [video_pub(r, me) for r in qa(
-            "SELECT * FROM videos WHERE challenge_id=? AND kind='recreate' AND status='approved' ORDER BY id DESC LIMIT 10", (feat["id"],))]
+            "SELECT * FROM videos WHERE challenge_id=? AND kind='recreate' AND status='approved' AND score>=100 ORDER BY id DESC LIMIT 10", (feat["id"],))]
     feed_create = [video_pub(r, me) for r in qa(
         "SELECT * FROM videos WHERE kind='creation' AND status='approved' ORDER BY id DESC LIMIT 10")]
     feed_recreate = [video_pub(r, me) for r in qa(
-        "SELECT * FROM videos WHERE kind='recreate' AND status='approved' ORDER BY id DESC LIMIT 10")]
+        "SELECT * FROM videos WHERE kind='recreate' AND status='approved' AND score>=100 ORDER BY id DESC LIMIT 10")]
     feed_beatit = [video_pub(r, me) for r in qa(
         "SELECT * FROM videos WHERE kind='beatit' AND status='approved' ORDER BY id DESC LIMIT 10")]
     sponsored = [challenge_pub(r, me) for r in qa(
