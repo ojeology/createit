@@ -208,10 +208,10 @@ def seed_if_empty():
     for vidn, who, text in comments:
         q("INSERT INTO comments (user_id, video_id, text, created_at) VALUES (?,?,?,?)", (U[who], vidn, text, now_iso(-1)))
 
-    notify(U["sarah"], "champion", "👑 You are the CHAMPION of CREATEIT #001 — THE IMPOSSIBLE TRICK, with a final score of 104%.", "/challenge/1")
-    notify(U["david"], "stage", "⚔️ CREATEIT #003 entered BEAT IT. You are qualified — you have ONE FINAL SUBMISSION.", "/challenge/3")
-    notify(U["nina"], "stage", "⚔️ CREATEIT #003 entered BEAT IT. You are qualified — you have ONE FINAL SUBMISSION.", "/challenge/3")
-    notify(U["nina"], "review", "📥 Your submission 'Fire Jollof in 30 Seconds' is under review by CreateIt.", "/notifications")
+    notify(U["sarah"], "champion", "You are the CHAMPION of CREATEIT #001 — THE IMPOSSIBLE TRICK, with a final score of 104%.", "/challenge/1")
+    notify(U["david"], "stage", "CREATEIT #003 entered BEAT IT. You are qualified — you have ONE FINAL SUBMISSION.", "/challenge/3")
+    notify(U["nina"], "stage", "CREATEIT #003 entered BEAT IT. You are qualified — you have ONE FINAL SUBMISSION.", "/challenge/3")
+    notify(U["nina"], "review", "Your submission 'Fire Jollof in 30 Seconds' is under review by CreateIt.", "/notifications")
     commit()
 
 # ---------------------------------------------------------------- serializers
@@ -291,7 +291,7 @@ def register():
     uid = q1("SELECT id FROM users WHERE username=?", (un,))["id"]
     tok = secrets.token_hex(24)
     q("INSERT INTO sessions VALUES (?,?,?)", (tok, uid, now_iso()))
-    notify(uid, "welcome", "👋 Welcome to CreateIt. Upload something uniquely yours — followers don't matter here.", "/create")
+    notify(uid, "welcome", "Welcome to CreateIt. Upload something uniquely yours — followers don't matter here.", "/create")
     commit()
     resp = jsonify(me=user_pub(uid)); resp.set_cookie("ci_token", tok, httponly=True, samesite="Lax", max_age=86400*30)
     return resp
@@ -383,7 +383,7 @@ def like(u, vid):
     else:
         q("INSERT INTO likes (user_id, video_id) VALUES (?,?)", (u["id"], vid)); liked = True
         if r["user_id"] != u["id"]:
-            notify(r["user_id"], "like", f"❤️ @{u['username']} liked your video “{r['title'] or 'Untitled'}”", f"/video/{vid}")
+            notify(r["user_id"], "like", f"@{u['username']} liked your video “{r['title'] or 'Untitled'}”", f"/video/{vid}")
     commit()
     return jsonify(liked=liked, likes=q1("SELECT COUNT(*) c FROM likes WHERE video_id=?", (vid,))["c"])
 
@@ -397,7 +397,7 @@ def comment(u, vid):
     if not r: return jsonify(error="Not found"), 404
     q("INSERT INTO comments (user_id, video_id, text, created_at) VALUES (?,?,?,?)", (u["id"], vid, text[:500], now_iso()))
     if r["user_id"] != u["id"]:
-        notify(r["user_id"], "comment", f"💬 @{u['username']} commented on “{r['title'] or 'Untitled'}”", f"/video/{vid}")
+        notify(r["user_id"], "comment", f"@{u['username']} commented on “{r['title'] or 'Untitled'}”", f"/video/{vid}")
     commit()
     return jsonify(ok=True, comments=q1("SELECT COUNT(*) c FROM comments WHERE video_id=?", (vid,))["c"])
 
@@ -411,7 +411,7 @@ def follow(u, username):
         q("DELETE FROM follows WHERE follower_id=? AND followee_id=?", (u["id"], t["id"])); f = False
     else:
         q("INSERT INTO follows (follower_id, followee_id) VALUES (?,?)", (u["id"], t["id"])); f = True
-        notify(t["id"], "follow", f"➕ @{u['username']} started following you", f"/user/{u['username']}")
+        notify(t["id"], "follow", f"@{u['username']} started following you", f"/user/{u['username']}")
     commit()
     return jsonify(following=f, followers=q1("SELECT COUNT(*) c FROM follows WHERE followee_id=?", (t["id"],))["c"])
 
@@ -505,7 +505,7 @@ def upload(u):
     q("INSERT INTO videos (user_id, kind, title, description, file, status, nominated, created_at) VALUES (?,?,?,?,?,'pending',?,?)",
       (u["id"], "creation", title or "Untitled creation", desc, fname, nominated, now_iso()))
     vid = q1("SELECT last_insert_rowid() id")["id"]
-    notify(u["id"], "review", f"📥 “{title or 'Your creation'}” was submitted and is under review by CreateIt.", "/notifications")
+    notify(u["id"], "review", f"“{title or 'Your creation'}” was submitted and is under review by CreateIt.", "/notifications")
     commit()
     return jsonify(ok=True, video_id=vid, message="Submitted to CreateIt for review. If it's special enough, it becomes a challenge.")
 
@@ -563,10 +563,10 @@ def admin_review(u):
            r["user_id"], r["id"], int(d.get("target") or 100), int(d.get("featured") or 0), now_iso(), now_iso(14)))
         cid = q1("SELECT last_insert_rowid() id")["id"]
         q("UPDATE videos SET status='approved', challenge_id=? WHERE id=?", (cid, r["id"]))
-        notify(r["user_id"], "challenge", f"🏆 “{r['title']}” was selected! It is now {code} — you are the benchmark everyone must chase.", f"/challenge/{cid}")
+        notify(r["user_id"], "challenge", f"“{r['title']}” was selected! It is now {code} — you are the benchmark everyone must chase.", f"/challenge/{cid}")
     else:
         q("UPDATE videos SET status='approved' WHERE id=?", (r["id"],))
-        notify(r["user_id"], "review", f"✅ Your creation “{r['title']}” was approved and is now live in Discover.", "/")
+        notify(r["user_id"], "review", f"Your creation “{r['title']}” was approved and is now live in Discover.", "/")
     commit()
     return jsonify(ok=True)
 
@@ -591,9 +591,9 @@ def admin_score(u):
         if ch["stage"] == "recreate_it" and ch["recreate_count"] >= ch["recreate_target"]:
             q("UPDATE challenges SET stage='recreate_closed' WHERE id=?", (ch["id"],))
             for row in qa("SELECT DISTINCT user_id FROM videos WHERE challenge_id=? AND kind='recreate' AND score>=100", (ch["id"],)):
-                notify(row["user_id"], "stage", f"🔒 {ch['code']} hit its recreate target — RECREATE CLOSED. Get ready for BEAT IT.", f"/challenge/{ch['id']}")
+                notify(row["user_id"], "stage", f"{ch['code']} hit its recreate target — RECREATE CLOSED. Get ready for BEAT IT.", f"/challenge/{ch['id']}")
     extra = " RECREATE COMPLETE — you are qualified for Beat It!" if r["kind"] == "recreate" and score >= 100 else ""
-    notify(r["user_id"], "score", f"🎯 CreateIt scored your “{r['title'] or 'submission'}”: {score:g}%.{extra}", f"/video/{r['id']}")
+    notify(r["user_id"], "score", f"CreateIt scored your “{r['title'] or 'submission'}”: {score:g}%.{extra}", f"/video/{r['id']}")
     commit()
     return jsonify(ok=True, score=score)
 
@@ -610,7 +610,7 @@ def admin_stage(u):
         q("UPDATE challenges SET recreate_target=? WHERE id=?", (int(d["recreate_target"]), ch["id"]))
     if stage == "beat_it":
         for row in qa("SELECT DISTINCT user_id FROM videos WHERE challenge_id=? AND kind='recreate' AND score>=100", (ch["id"],)):
-            notify(row["user_id"], "stage", f"⚔️ {ch['code']} entered BEAT IT. You are qualified — ONE FINAL SUBMISSION.", f"/challenge/{ch['id']}")
+            notify(row["user_id"], "stage", f"{ch['code']} entered BEAT IT. You are qualified — ONE FINAL SUBMISSION.", f"/challenge/{ch['id']}")
     if stage == "champion" and not ch["champion_id"]:
         pass  # champion must be crowned via /api/admin/crown
     commit()
@@ -624,7 +624,7 @@ def admin_featured(u):
     if not ch: return jsonify(error="Not found"), 404
     q("UPDATE challenges SET featured=0")
     q("UPDATE challenges SET featured=1 WHERE id=?", (ch["id"],))
-    notify(ch["creator_id"], "featured", f"🌟 You are the CREATEIT CREATOR OF THE WEEK for {ch['code']}!", f"/challenge/{ch['id']}")
+    notify(ch["creator_id"], "featured", f"You are the CREATEIT CREATOR OF THE WEEK for {ch['code']}!", f"/challenge/{ch['id']}")
     commit()
     return jsonify(ok=True)
 
@@ -639,9 +639,9 @@ def admin_crown(u):
     if r["score"] is None: return jsonify(error="Score this submission first"), 400
     q("UPDATE challenges SET stage='champion', champion_id=?, champion_video_id=?, champion_score=?, champion_at=? WHERE id=?",
       (r["user_id"], r["id"], r["score"], now_iso(), ch["id"]))
-    notify(r["user_id"], "champion", f"👑 You are the CHAMPION of {ch['code']} — {ch['title']}, with a final score of {r['score']:g}%!", f"/challenge/{ch['id']}")
+    notify(r["user_id"], "champion", f"You are the CHAMPION of {ch['code']} — {ch['title']}, with a final score of {r['score']:g}%!", f"/challenge/{ch['id']}")
     for row in qa("SELECT DISTINCT user_id FROM videos WHERE challenge_id=? AND kind='beatit' AND user_id != ?", (ch["id"], r["user_id"])):
-        notify(row["user_id"], "champion", f"👑 {ch['code']} has a new champion: @{q1('SELECT username FROM users WHERE id=?',(r['user_id'],))['username']} ({r['score']:g}%). Records can be broken…", f"/challenge/{ch['id']}")
+        notify(row["user_id"], "champion", f"{ch['code']} has a new champion: @{q1('SELECT username FROM users WHERE id=?',(r['user_id'],))['username']} ({r['score']:g}%). Records can be broken…", f"/challenge/{ch['id']}")
     commit()
     return jsonify(ok=True)
 
@@ -672,7 +672,9 @@ def uploads_file(fn):
 def spa(path):
     if path.startswith(("api/", "uploads/", "static/")):
         return jsonify(error="Not found"), 404
-    return send_from_directory(os.path.join(BASE, "static"), "index.html")
+    resp = app.send_static_file("index.html")
+    resp.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return resp
 
 # Seed on import so it works with `python app.py` AND gunicorn (app:app)
 with app.app_context():
