@@ -642,7 +642,10 @@ async function viewHome() {
 }
 
 async function viewChallenges(query) {
-  const [cd, lb, hd] = await Promise.all([api("/api/challenges"), api("/api/leaderboard"), api("/api/home")]);
+  const [cdr, lbr, hdr] = await Promise.allSettled([api("/api/challenges"), api("/api/leaderboard"), api("/api/home")]);
+  const cd = cdr.status === "fulfilled" ? cdr.value : { challenges: [] };
+  const lb = lbr.status === "fulfilled" ? lbr.value : { records: [], champions: [], top: [] };
+  const hd = hdr.status === "fulfilled" ? hdr.value : { discover: [] };
   const all = cd.challenges;
   const live = all.filter(c => c.stage === "recreate_it");
   const hot = [...live].sort((a, b) => b.participants - a.participants || b.attempts_total - a.attempts_total);
@@ -1122,22 +1125,46 @@ function setupDisc() {
     if (DISC.muted) { DISC.muted = false; vid.muted = false; toast("Sound on"); }
   });
 }
+let DISC_TIMER = null;
+function loadDiscFeed(filter, q) {
+  const feed = $("#disc-feed");
+  if (!feed) return;
+  feed.innerHTML = `<div class="disc-load">SEARCHING THE ARENA…</div>`;
+  const qs = q ? `&q=${encodeURIComponent(q)}` : "";
+  api(`/api/discover?filter=${encodeURIComponent(filter)}&limit=30${qs}`).then(d => {
+    if (!document.contains(feed)) return;
+    delete feed.dataset.ready;
+    feed.innerHTML = d.videos.length
+      ? d.videos.map((v, i) => discSlideHTML(v, i)).join("")
+      : `<div class="disc-load">${q ? `NO RESULTS FOR “${esc(q).toUpperCase()}” — TRY ANOTHER WORD` : "NOTHING HERE YET — BE THE FIRST TO CREATE"}</div>`;
+    setupDisc();
+  }).catch(() => { if (document.contains(feed)) feed.innerHTML = `<div class="disc-load">COULD NOT LOAD — CHECK YOUR CONNECTION</div>`; });
+}
 async function viewDiscover(query) {
   const filter = query.get("f") || "trending";
+  const q0 = query.get("q") || "";
   const filters = [["trending", "TRENDING"], ["new", "NEW"], ["challenges", "CHALLENGES"], ["originals", "ORIGINALS"], ["champions", "CHAMPIONS"]];
   const shell = `<div class="disc-stage">
     <div class="disc-top">
-      <button class="icon-btn dt-close" data-nav="/" title="Back">${ic("arrow", 17)}</button>
-      ${filters.map(([k, l]) => `<button class="chip ${k === filter ? "active" : ""}" data-nav="/discover?f=${k}">${l}</button>`).join("")}
+      <div class="dt-row1">
+        <button class="icon-btn dt-close" data-nav="/" title="Back">${ic("arrow", 17)}</button>
+        <div class="dt-search">${ic("target", 15)}<input id="disc-search" type="search" placeholder="Search creators, challenges, skills…" value="${esc(q0)}" autocomplete="off"></div>
+      </div>
+      <div class="dt-row2">${filters.map(([k, l]) => `<button class="chip ${k === filter ? "active" : ""}" data-nav="/discover?f=${k}${q0 ? "&q=" + encodeURIComponent(q0) : ""}">${l}</button>`).join("")}</div>
     </div>
     <div class="disc-feed" id="disc-feed"><div class="disc-load">LOADING DISCOVER…</div></div>
   </div>`;
-  api(`/api/discover?filter=${encodeURIComponent(filter)}&limit=30`).then(d => {
-    const feed = $("#disc-feed");
-    if (!feed) return;
-    feed.innerHTML = d.videos.length ? d.videos.map((v, i) => discSlideHTML(v, i)).join("") : `<div class="disc-load">NOTHING HERE YET — BE THE FIRST TO CREATE</div>`;
-    setupDisc();
-  }).catch(() => { const feed = $("#disc-feed"); if (feed) feed.innerHTML = `<div class="disc-load">COULD NOT LOAD — TRY AGAIN</div>`; });
+  setTimeout(() => {
+    const inp = $("#disc-search");
+    if (inp) {
+      inp.addEventListener("input", () => {
+        clearTimeout(DISC_TIMER);
+        DISC_TIMER = setTimeout(() => loadDiscFeed(filter, inp.value.trim()), 320);
+      });
+      inp.addEventListener("keydown", e => { if (e.key === "Enter") { clearTimeout(DISC_TIMER); loadDiscFeed(filter, inp.value.trim()); } });
+    }
+  }, 0);
+  loadDiscFeed(filter, q0);
   return shell;
 }
 

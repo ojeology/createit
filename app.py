@@ -153,7 +153,7 @@ def seed_if_empty():
     U["mike"]  = user("mike",  "Mike Eze",     "⚡", "#FFB300", "98% is not enough.")
     U["john"]  = user("john",  "John Danladi", "🎯", "#FF6FB2", "Precision is a habit.")
     U["zoe"]   = user("zoe",   "Zoe Martins",  "🌙", "#9D6BFF", "Dancer. Creator of the Moonwalk Ladder.")
-    U["efe"]   = user("efe",   "Efe Ogbe",     "🧩", "#3ECF8E", "Speedcuber. Blindfolded. 60 seconds.")
+    U["efe"]   = user("efe",   "Efe Ogbe",     "🧩", "#3ECF8E", "Skater. Kickflips are my language.")
     U["nina"]  = user("nina",  "Nina Bello",   "🌶️", "#FF7849", "Chef. I cook fast and I recreate faster.")
     U["tobi"]  = user("tobi",  "Tobi Akin",    "🎲", "#4CC9F0", "Bottle flip scientist.")
     U["kofi"]  = user("kofi",  "Kofi Mensah",  "🥁", "#F4A259", "Drummer with too many hands.")
@@ -194,18 +194,18 @@ def seed_if_empty():
     vid(U["kofi"],  "recreate", "c2_zoe2.mp4",  "Attempt #3", "Drummer rhythm helps.", score=100, attempt=3, ch=C2, ago=3)
 
     # ---- Challenge #003 — BLINDFOLDED RUBIK 60s — BEAT IT ----
-    v3 = vid(U["efe"], "creation", "c3_original.mp4", "Blindfolded Rubik in 60 Seconds", "Solve from any scramble, blindfolded, under one minute.", ago=12)
-    C3 = chal("CREATEIT #003", "BLINDFOLDED RUBIK · 60s", "Recreate a blindfolded solve in 60 seconds. Then Beat It by going faster or fancier.", U["efe"], v3, "beat_it", 30, 30, ago=12)
+    v3 = vid(U["efe"], "creation", "c3_original.mp4", "The 360 Kickflip", "Pop, rotate, catch clean. One take, no footer.", ago=12)
+    C3 = chal("CREATEIT #003", "THE 360 KICKFLIP", "Recreate the kickflip exactly as landed. Then Beat It — bring a harder variation, one final run.", U["efe"], v3, "beat_it", 30, 30, ago=12)
     q("UPDATE videos SET challenge_id=? WHERE id=?", (C3, v3))
-    vid(U["david"], "recreate", "c3_david.mp4", "Attempt #4", "58 seconds. Hands shaking.", score=100, attempt=4, ch=C3, ago=6)
-    vid(U["nina"],  "recreate", "c3_nina.mp4",  "Attempt #7", "I dream in algorithms now.", score=100, attempt=7, ch=C3, ago=5)
-    vid(U["david"], "beatit", "c3_beat_david.mp4", "Beat It — Final Submission", "51 seconds. New record pace.", score=102, ch=C3, ago=1)
-    vid(U["nina"],  "beatit", "c3_beat_nina.mp4",  "Beat It — Final Submission", "One-handed attempt. 59 seconds.", score=99, ch=C3, ago=1)
+    vid(U["david"], "recreate", "c3_david.mp4", "Attempt #4", "Landed first try. Legs still shaking.", score=100, attempt=4, ch=C3, ago=6)
+    vid(U["nina"],  "recreate", "c3_nina.mp4",  "Attempt #7", "Been practicing this line all month.", score=100, attempt=7, ch=C3, ago=5)
+    vid(U["david"], "beatit", "c3_beat_david.mp4", "Beat It — Final Submission", "Switched stance. Bigger rotation.", score=102, ch=C3, ago=1)
+    vid(U["nina"],  "beatit", "c3_beat_nina.mp4",  "Beat It — Final Submission", "Added a late shove. Clean landing.", score=99, ch=C3, ago=1)
 
     # ---- Pending submissions (admin queue) + Discover ----
     vid(U["nina"], "creation", "pend_nina.mp4", "Fire Jollof in 30 Seconds", "Full jollof plating in half a minute. I believe this deserves a challenge.", status="pending", nominated=1, ago=1)
-    vid(U["tobi"], "creation", "pend_tobi.mp4", "Bottle Flip Ladder Edition", "Five consecutive ladder flips. Submitting for CreateIt consideration.", status="pending", ago=1)
-    vid(U["kofi"], "creation", "disc_kofi.mp4", "Drumstick Isolation", "Viral clip — CreateIt scouts flagged this as exceptional.", status="approved", ago=2)
+    vid(U["tobi"], "creation", "pend_tobi.mp4", "The Half-Court Shot", "Off the dribble, from the logo, nothing but net. I believe this deserves a challenge.", status="pending", ago=1)
+    vid(U["kofi"], "creation", "disc_kofi.mp4", "The Midnight Groove", "Viral clip — CreateIt scouts flagged this as exceptional.", status="approved", ago=2)
 
     # ---- Social graph ----
     follows = [("sarah","alex"),("sarah","zoe"),("david","sarah"),("david","alex"),("mike","sarah"),("john","david"),
@@ -230,7 +230,7 @@ def seed_if_empty():
                 (v2,"david","This took me 9 attempts. Do not rush the last step."),
                 (v2,"nina","Attempting this tonight. Ladder ordered already 😅"),
                 (sarah_vids[0],"zoe","Everyone starts somewhere. Watch this journey."),
-                (v3,"sarah","Blindfolded?! OK this is special.")]
+                (v3,"sarah","The rotation on this is clean. OK this is special.")]
     for vidn, who, text in comments:
         q("INSERT INTO comments (user_id, video_id, text, created_at) VALUES (?,?,?,?)", (U[who], vidn, text, now_iso(-1)))
 
@@ -674,6 +674,15 @@ def discover_feed():
     f = request.args.get("filter") or "trending"
     try: limit = min(int(request.args.get("limit", 30)), 50)
     except ValueError: limit = 30
+    qstr = (request.args.get("q") or "").strip()
+    if qstr:
+        like = f"%{qstr}%"
+        rows = qa("""SELECT v.* FROM videos v JOIN users u ON u.id=v.user_id
+                     LEFT JOIN challenges c ON c.id=v.challenge_id
+                     WHERE v.status='approved' AND (v.title LIKE ? OR v.description LIKE ? OR u.username LIKE ?
+                       OR u.display_name LIKE ? OR COALESCE(c.code,'') LIKE ? OR COALESCE(c.title,'') LIKE ?)
+                     ORDER BY v.id DESC LIMIT ?""", (like, like, like, like, like, like, limit))
+        return jsonify(videos=videos_pub(rows, me), filter=f, q=qstr)
     if f == "new":
         rows = qa("SELECT * FROM videos WHERE status='approved' ORDER BY id DESC LIMIT ?", (limit,))
     elif f == "originals":
