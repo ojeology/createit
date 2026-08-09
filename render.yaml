@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: createit
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # 1 worker + threads: SQLite is single-writer; threads handle concurrency
+    startCommand: gunicorn --workers 1 --threads 4 -b 0.0.0.0:$PORT app:app
+    autoDeploy: true
+    healthCheckPath: /api/me

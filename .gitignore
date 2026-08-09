@@ -1,0 +1,17 @@
+# runtime data — never commit (demo state re-seeds automatically on deploy)
+createit.db
+sessions/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# local jars / scratch
+/tmp
+nohup.out
+
+# caches
+.cache/
+*.egg-info/
