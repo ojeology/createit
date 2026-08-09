@@ -64,6 +64,64 @@ async function refreshMe() {
   try { const d = await api("/api/me"); ME = d.me; } catch (e) { ME = null; }
 }
 
+// ---------------- signature logo ----------------
+let _logoN = 0;
+function logoSVG(size = 26) {
+  const id = "lg" + (++_logoN);
+  return `<svg class="logo-mark" width="${size}" height="${size}" viewBox="0 0 64 64" fill="none">
+    <defs><linearGradient id="${id}" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#FF4D2E"/><stop offset=".55" stop-color="#FF7A3C"/><stop offset="1" stop-color="#FFB300"/>
+    </linearGradient></defs>
+    <rect x="9" y="38" width="10" height="18" rx="3" fill="url(#${id})" opacity=".5"/>
+    <rect x="25" y="28" width="10" height="28" rx="3" fill="url(#${id})" opacity=".78"/>
+    <rect x="41" y="18" width="10" height="38" rx="3" fill="url(#${id})"/>
+    <path d="M46 2c3.2 3.8 5.6 6.2 5.6 9.4a5.6 5.6 0 1 1-11.2 0C40.4 8.2 42.8 5.8 46 2z" fill="#FFB300"/>
+  </svg>`;
+}
+const brandHTML = (size = 26) => `<span class="brand">${logoSVG(size)}<span class="wordmark">CREATE<span class="w-it">IT</span></span></span>`;
+
+// ---------------- splash ----------------
+(function splash() {
+  const s = document.getElementById("splash");
+  if (!s) return;
+  let done = false;
+  const dismiss = () => {
+    if (done) return; done = true;
+    s.classList.add("sp-exit");
+    setTimeout(() => s.remove(), 700);
+  };
+  s.addEventListener("click", dismiss);
+  setTimeout(dismiss, 3300);
+})();
+
+// ---------------- scroll reveals + count-ups ----------------
+let _io = null;
+function observeReveals() {
+  if (!_io) _io = new IntersectionObserver(es => {
+    es.forEach(en => { if (en.isIntersecting) { en.target.classList.add("revealed"); _io.unobserve(en.target); } });
+  }, { threshold: 0.06 });
+  $$("#app > *:not(.reveal)").forEach((el, i) => {
+    el.classList.add("reveal");
+    el.style.transitionDelay = Math.min(i * 45, 270) + "ms";
+    _io.observe(el);
+  });
+  $$("#app .big-title:not(.reveal)").forEach(el => { el.classList.add("reveal"); _io.observe(el); });
+}
+function runCountUps() {
+  $$("[data-count]").forEach(el => {
+    if (el.dataset.counted) return;
+    el.dataset.counted = "1";
+    const target = parseFloat(el.dataset.count), suffix = el.dataset.suffix || "";
+    const t0 = performance.now(), dur = 1100;
+    const step = t => {
+      const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(target * e).toLocaleString() + suffix;
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
 // ---------------- chrome (topbar + navs) ----------------
 function renderChrome() {
   const unread = ME?.unread || 0;
@@ -73,7 +131,7 @@ function renderChrome() {
        <button class="icon-btn" id="btn-logout" title="Log out">↩</button>`
     : `<button class="btn btn-fire btn-sm" data-nav="/login" style="border-radius:11px">LOG IN</button>`;
   $("#topbar").innerHTML = `
-    <a class="wordmark" data-nav="/" href="#/">CREATE<span class="w-it">IT</span></a>
+    <a data-nav="/" href="#/" aria-label="CreateIt home">${brandHTML(24)}</a>
     <span class="tagline">Create It · Recreate It · Beat It</span>
     <span class="tb-spacer"></span>${bell}${userBtn}`;
 
@@ -96,7 +154,7 @@ function renderChrome() {
     </div>` : `<button class="rail-item" data-nav="/login"><span class="ico">🔑</span>Log in</button>`;
   const rail = $("#railnav");
   rail.innerHTML = `
-    <a class="wordmark" data-nav="/" href="#/">CREATE<span class="w-it">IT</span></a>
+    <a data-nav="/" href="#/" aria-label="CreateIt home">${brandHTML(28)}</a>
     <span class="tagline">Create It · Recreate It · Beat It</span>
     <button class="rail-item ${route === "/" ? "active" : ""}" data-nav="/"><span class="ico">🏠</span>Home</button>
     <button class="rail-item ${route.startsWith("/challenges") ? "active" : ""}" data-nav="/challenges"><span class="ico">🔥</span>Challenges</button>
@@ -250,6 +308,7 @@ document.addEventListener("click", async e => {
       const d = await api(`/api/video/${vid}/like`, { method: "POST" });
       el.classList.toggle("btn-fire", d.liked);
       el.querySelector("span").textContent = d.likes;
+      el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
     }
     else if (act === "send-comment") {
       const inp = $("#pl-comment-input");
@@ -287,7 +346,7 @@ async function viewHome() {
         ${stagePill(h.stage)}
         <span>Creator <b>@${esc(h.creator.username)}</b></span>
         <span>👥 <b>${h.participants}</b> participants</span>
-        <span>🎯 <b>${h.recreate_count.toLocaleString()}</b> / ${h.recreate_target.toLocaleString()} recreations</span>
+        <span>🎯 <b data-count="${h.recreate_count}">0</b> / ${h.recreate_target.toLocaleString()} recreations</span>
         ${h.stage === "recreate_it" && h.days_left != null ? `<span>⏳ <b>${h.days_left}</b> days left</span>` : ""}
       </div>
       <div class="progress" style="max-width:520px"><div style="width:${Math.min(100, Math.round(h.recreate_count / h.recreate_target * 100))}%"></div></div>
@@ -792,7 +851,7 @@ async function route() {
   const query = new URLSearchParams(qs || "");
   const app = $("#app");
   window.scrollTo(0, 0);
-  app.innerHTML = `<div class="loading"><div class="spinner"></div><p>LOADING…</p></div>`;
+  app.innerHTML = `<div class="loading">${logoSVG(38)}<div class="spinner"></div><p>LOADING…</p></div>`;
   renderChrome();
   try {
     let html;
@@ -807,6 +866,8 @@ async function route() {
       html = `<div class="empty">Lost in the arena. <a href="#/" style="color:var(--fire2)">Go home</a></div>`;
     }
     app.innerHTML = html;
+    observeReveals();
+    runCountUps();
   } catch (err) {
     app.innerHTML = `<div class="empty">⚠️ ${esc(err.message)}</div>`;
   }
