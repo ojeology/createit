@@ -435,15 +435,18 @@ document.addEventListener("click", async e => {
     else if (act === "close-player") closePlayer();
     else if (act === "share") { try { await navigator.clipboard.writeText(location.origin + "/#/video/" + (el.dataset.vid || PLAYER_VID)); } catch (err) {} toast("Link copied — share the journey."); }
     else if (act === "like") {
-      if (!ME) { location.hash = "/login"; return; }
-      const d = await api(`/api/video/${vid}/like`, { method: "POST" });
-      el.classList.toggle("btn-fire", d.liked);
-      el.querySelector("span").textContent = d.likes;
-      el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
-      if (d.liked) burst(el);
+      if (!ME) { toast("Log in to react to creations"); setTimeout(() => location.hash = "/login", 400); return; }
+      const span = el.querySelector("span");
+      const wasLiked = el.classList.contains("btn-fire") || el.classList.contains("on");
+      el.classList.toggle("btn-fire", !wasLiked); el.classList.toggle("on", !wasLiked);
+      if (span) span.textContent = Math.max(0, (parseInt(span.textContent) || 0) + (wasLiked ? -1 : 1));
+      if (!wasLiked) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); burst(el); }
+      try { const d = await api(`/api/video/${vid}/like`, { method: "POST" }); if (span) span.textContent = d.likes; }
+      catch (err) { toast(err.message, true); }
     }
     else if (act === "send-comment") {
       const inp = $("#pl-comment-input");
+      if (!ME) { toast("Log in to join the conversation"); setTimeout(() => location.hash = "/login", 400); return; }
       const text = inp.value.trim();
       if (!text) return;
       await api(`/api/video/${vid}/comment`, { method: "POST", json: { text } });
@@ -564,12 +567,6 @@ async function viewHome() {
   HOME_DATA = d;
   const h = d.hero;
   return `
-  <div class="loop-strip">
-    <span class="loop-step c">CREATE IT</span><span class="loop-arrow">${ic("arrow", 13)}</span>
-    <span class="loop-step r">RECREATE IT</span><span class="loop-arrow">${ic("arrow", 13)}</span>
-    <span class="loop-step b">BEAT IT</span>
-    <span class="loop-cap">What can you do that is uniquely yours? Followers don't matter here — the challenge does.</span>
-  </div>
   ${tickerHTML(d)}
 
   ${h ? `
@@ -1177,7 +1174,7 @@ async function viewDiscover(query) {
       </div>
       <div class="dt-row2">${filters.map(([k, l]) => `<button class="chip ${k === filter ? "active" : ""}" data-nav="/discover?f=${k}${q0 ? "&q=" + encodeURIComponent(q0) : ""}">${l}</button>`).join("")}</div>
     </div>
-    <div class="disc-feed" id="disc-feed"><div class="disc-load">LOADING DISCOVER…</div></div>
+    <div class="disc-feed" id="disc-feed"><div class="disc-load">· · ·</div></div>
   </div>`;
   setTimeout(() => {
     const inp = $("#disc-search");
@@ -1188,8 +1185,8 @@ async function viewDiscover(query) {
       });
       inp.addEventListener("keydown", e => { if (e.key === "Enter") { clearTimeout(DISC_TIMER); loadDiscFeed(filter, inp.value.trim()); } });
     }
+    loadDiscFeed(filter, q0);
   }, 0);
-  loadDiscFeed(filter, q0);
   return shell;
 }
 

@@ -1211,3 +1211,136 @@ body::after{background:radial-gradient(circle, rgba(90,100,140,.07), transparent
 /* real 16:9 footage fills Discover cleanly with contain */
 .disc-slide video{object-fit:contain;background:#000}
 @media (min-width:900px){.disc-feed{max-width:min(100vh,56vw)}}
+
+/* ============================================================
+   v12 — BETA POLISH: studio-grade spacing, texture, calm
+   ============================================================ */
+/* depth + film grain texture */
+body{background:linear-gradient(180deg,#0b0d13 0%,#08090e 100%) fixed}
+body::before{opacity:.7}
+body::after{opacity:.7}
+#bg-grain{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");background-size:180px 180px;opacity:1}
+
+/* speed: skip rendering offscreen blocks */
+.hscroll,.grid3,.records-grid,.feed-strip,.stage-area,.deck-track,.beat-board,.arena-grid{content-visibility:auto;contain-intrinsic-size:auto 340px}
+
+/* spacing rhythm */
+#app{padding:22px 18px 120px}
+@media (min-width:900px){#app{padding:38px 44px 60px}}
+.sec{margin:58px 0 20px}
+.sec h2{font-size:23px;letter-spacing:2.2px}
+.sec .sub{text-transform:none;letter-spacing:.2px;font-size:12.5px;font-weight:500}
+.sec-n{-webkit-text-stroke:1px rgba(255,255,255,.16);font-size:12px}
+
+/* live wire — quieter */
+.ticker{height:34px;border:none;border-top:1px solid var(--line);border-bottom:1px solid var(--line);border-radius:0;background:transparent;margin:0 0 6px}
+.ticker .tk-label{background:none;color:var(--champ);clip-path:none;padding:0 12px 0 2px;font-size:9px}
+.tk-item{font-size:10.5px;color:#7d8494;letter-spacing:1.3px}
+.tk-item b{color:#c9ceda;font-weight:600}
+
+/* calmer cards */
+.ch-card,.v-card,.arena-card,.records-card{border-color:rgba(255,255,255,.06);box-shadow:inset 0 1px 0 rgba(255,255,255,.03), 0 6px 22px rgba(0,0,0,.28)}
+.ch-card:hover,.v-card:hover,.arena-card:hover{border-color:rgba(255,255,255,.14);box-shadow:0 18px 44px rgba(0,0,0,.42)}
+.ch-card:hover{transform:translateY(-3px)}.v-card:hover{transform:translateY(-3px)}
+.play-tag{background:rgba(8,10,14,.85);border:none;backdrop-filter:blur(6px)}
+.v-overlay .v-title{font-weight:600;font-size:12px}
+.ch-title{font-size:19px;letter-spacing:1px}
+.ar-title{font-size:21px}
+.ch-by{font-size:12px}
+.progress{border:none;background:rgba(255,255,255,.06)}
+.progress>div{box-shadow:none}
+
+/* buttons — refined */
+.btn{letter-spacing:1.1px;border-radius:12px}
+.btn-fire{box-shadow:0 6px 20px rgba(225,78,42,.24)}
+.btn-fire:hover{box-shadow:0 10px 28px rgba(225,78,42,.36)}
+.btn-ghost{border-color:var(--line2)}
+.btn-sm{border-radius:10px}
+.chip{background:rgba(255,255,255,.03);font-weight:600;letter-spacing:.6px}
+
+/* hero refinement */
+.event-frame{border-radius:26px}
+.event-inner{border-radius:24px;background:var(--surface)}
+.hero-vid{aspect-ratio:16/8.2}
+@media (max-width:640px){.hero-vid{aspect-ratio:4/4.4}}
+.hi-title{font-size:clamp(28px,5vw,48px);letter-spacing:1.8px}
+.event-badge{font-size:9px;letter-spacing:2.8px;padding:7px 13px}
+.ev-stat{padding:18px 12px}
+.ev-stat .k{letter-spacing:1.6px;font-weight:700}
+.event-stats{background:transparent}
+.event-cta{padding:4px 20px 20px}
+.hi-livechip{background:rgba(8,11,10,.62);font-size:9.5px;letter-spacing:2px}
+.ds-owner{background:rgba(8,10,14,.55);font-size:13px}
+.p-sound{background:rgba(8,10,14,.62)}
+
+/* stage tabs */
+.st-tab{background:rgba(255,255,255,.03)}
+.st-tab .st-name{letter-spacing:1.6px}
+.st-tab.active{border-color:transparent}
+
+/* beat board */
+.beat-board{border-radius:22px;border-color:rgba(225,78,42,.22);padding:22px}
+.bb-title{letter-spacing:1.4px}
+.bb-stat{background:rgba(8,10,14,.55);border-radius:13px}
+
+/* arena */
+.arena-head{border-radius:26px;padding:34px 30px;margin-bottom:8px}
+.arena-head h1{letter-spacing:3px}
+.arena-head p{font-size:14px;color:#8b92a2}
+.arena-emblem{width:118px;height:118px}
+.ah-stats{gap:30px;margin-top:16px}
+.ah-stat .hk{letter-spacing:1.6px;font-weight:700}
+.arena-grid{gap:18px}
+.ars{padding:10px 6px}
+.ars-k{letter-spacing:1.3px;font-weight:700}
+
+/* profile */
+.prof-head{gap:22px;margin-bottom:14px}
+.prof-id h1{font-size:30px;letter-spacing:1.2px}
+.stat-strip{gap:12px;margin:20px 0}
+.stat-box{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.06)}
+.stat-box .k{font-weight:700;letter-spacing:1.4px}
+.pf-tab{background:rgba(255,255,255,.03);letter-spacing:1.4px}
+.up-row{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.06)}
+.journey{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.06);border-radius:20px}
+.j-row{background:rgba(255,255,255,.03)}
+
+/* player refinement */
+.p-full .p-close{background:rgba(8,10,14,.62)}
+.p-top-ctx .ptc-pill{background:rgba(8,10,14,.6);border-color:rgba(255,255,255,.13)}
+.ptc-line1{letter-spacing:2.2px}
+.pc-owner{background:rgba(8,10,14,.55)}
+.rail-act{background:rgba(8,10,14,.55);border-color:rgba(255,255,255,.1)}
+.p-comments{background:rgba(9,11,16,.96)}
+
+/* discover chrome */
+.disc-top{padding:10px 12px 8px;background:linear-gradient(to bottom,rgba(0,0,0,.72) 30%,transparent)}
+.dt-search{background:rgba(8,10,14,.7);border-color:rgba(255,255,255,.12)}
+.dt-search input{font-size:13.5px}
+.disc-top .chip{padding:6px 13px;font-size:10.5px;letter-spacing:1.2px;background:rgba(255,255,255,.05)}
+.disc-top .chip.active{background:var(--grad-fire)}
+.disc-ctx .btn{background:rgba(8,10,14,.62);backdrop-filter:blur(8px)}
+.disc-ctx .btn-fire{background:var(--grad-fire)}
+.disc-load{font-size:10px;letter-spacing:4px;color:var(--dim)}
+.ds-kind{letter-spacing:2px;font-size:9.5px}
+
+/* empty states — hairline, elegant */
+.empty{border:1px solid var(--line);border-radius:18px;padding:42px 14px;font-size:13px;color:#7d8494;background:rgba(255,255,255,.02)}
+
+/* quote */
+.quote{color:#6d7484;font-size:clamp(17px,3.2vw,23px);letter-spacing:1.6px;padding:40px 12px}
+
+/* loading — minimal */
+.loading p{color:var(--dim);font-size:10px;letter-spacing:4px}
+.skel{background:rgba(255,255,255,.04)}
+
+/* topbar/rail refinement */
+#topbar{padding:12px 18px}
+#railnav{padding:24px 16px;gap:7px}
+.rail-item{font-size:12px;letter-spacing:1.2px;padding:11px 14px}
+.rail-user{background:rgba(255,255,255,.03)}
+.bn-item{font-size:9px;letter-spacing:1px}
+
+/* moment + records */
+.moment-card{border-radius:24px}
+.records-card .rc-title{font-size:18px;letter-spacing:1px}
