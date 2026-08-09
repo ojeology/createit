@@ -6,27 +6,29 @@
 <title>CREATEIT — Create It. Recreate It. Beat It.</title>
 <meta name="description" content="CreateIt is a social creativity and competition platform. Create something uniquely yours, let the world recreate it, then watch them try to beat it.">
 <meta name="theme-color" content="#06080e">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='1' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%23FF4D2E'/%3E%3Cstop offset='1' stop-color='%23FFB300'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='9' y='38' width='10' height='18' rx='3' fill='url(%23g)' opacity='.5'/%3E%3Crect x='25' y='28' width='10' height='28' rx='3' fill='url(%23g)' opacity='.75'/%3E%3Crect x='41' y='18' width='10' height='38' rx='3' fill='url(%23g)'/%3E%3Cpath d='M46 2c3.2 3.8 5.6 6.2 5.6 9.4a5.6 5.6 0 1 1-11.2 0C40.4 8.2 42.8 5.8 46 2z' fill='%23FFB300'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='1' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%23FF3D1F'/%3E%3Cstop offset='.5' stop-color='%23FF7A3C'/%3E%3Cstop offset='1' stop-color='%23FFC42E'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12 58H46' stroke='url(%23g)' stroke-width='7' stroke-linecap='round' opacity='.4'/%3E%3Cpath d='M66 58H84' stroke='url(%23g)' stroke-width='7' stroke-linecap='round' opacity='.4'/%3E%3Cpath d='M22 80 33 52' stroke='url(%23g)' stroke-width='10' stroke-linecap='round' opacity='.5'/%3E%3Cpath d='M38 82 53 42' stroke='url(%23g)' stroke-width='10' stroke-linecap='round' opacity='.8'/%3E%3Cpath d='M54 84 73 24' stroke='url(%23g)' stroke-width='11' stroke-linecap='round'/%3E%3Cpath d='M77 5l3.2 8.8L89 17l-8.8 3.2L77 29l-3.2-8.8L65 17l8.8-3.2z' fill='%23FFC42E'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=3">
+<link rel="stylesheet" href="/static/style.css?v=4">
 </head>
 <body>
 
 <!-- ═══════════ SIGNATURE SPLASH ═══════════ -->
 <div id="splash" aria-label="CreateIt intro">
   <div class="sp-aura"></div>
-  <svg class="sp-logo" viewBox="0 0 64 64" fill="none">
+  <svg class="sp-logo" viewBox="0 0 96 96" fill="none" aria-hidden="true">
     <defs>
       <linearGradient id="splg" x1="0" y1="1" x2="1" y2="0">
-        <stop offset="0" stop-color="#FF4D2E"/><stop offset=".55" stop-color="#FF7A3C"/><stop offset="1" stop-color="#FFB300"/>
+        <stop offset="0" stop-color="#FF3D1F"/><stop offset=".5" stop-color="#FF7A3C"/><stop offset="1" stop-color="#FFC42E"/>
       </linearGradient>
     </defs>
-    <rect x="9" y="38" width="10" height="18" rx="3" fill="url(#splg)" opacity=".5"/>
-    <rect x="25" y="28" width="10" height="28" rx="3" fill="url(#splg)" opacity=".78"/>
-    <rect x="41" y="18" width="10" height="38" rx="3" fill="url(#splg)"/>
-    <path d="M46 2c3.2 3.8 5.6 6.2 5.6 9.4a5.6 5.6 0 1 1-11.2 0C40.4 8.2 42.8 5.8 46 2z" fill="#FFB300"/>
+    <path d="M12 58H46" stroke="url(#splg)" stroke-width="7" stroke-linecap="round" opacity=".4"/>
+    <path d="M66 58H84" stroke="url(#splg)" stroke-width="7" stroke-linecap="round" opacity=".4"/>
+    <path d="M22 80 33 52" stroke="url(#splg)" stroke-width="10" stroke-linecap="round" opacity=".5"/>
+    <path d="M38 82 53 42" stroke="url(#splg)" stroke-width="10" stroke-linecap="round" opacity=".8"/>
+    <path d="M54 84 73 24" stroke="url(#splg)" stroke-width="11" stroke-linecap="round"/>
+    <path d="M77 5l3.2 8.8L89 17l-8.8 3.2L77 29l-3.2-8.8L65 17l8.8-3.2z" fill="#FFC42E"/>
   </svg>
   <div class="sp-word">
     <span class="sp-l" style="--i:0">C</span><span class="sp-l" style="--i:1">R</span><span class="sp-l" style="--i:2">E</span><span class="sp-l" style="--i:3">A</span><span class="sp-l" style="--i:4">T</span><span class="sp-l" style="--i:5">E</span><span class="sp-l it" style="--i:6">I</span><span class="sp-l it" style="--i:7">T</span>
@@ -48,6 +50,6 @@
 <div id="player-root"></div>
 <div id="modal-root"></div>
 <div id="toast-root"></div>
-<script src="/static/app.js?v=3"></script>
+<script src="/static/app.js?v=4"></script>
 </body>
 </html>

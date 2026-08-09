@@ -113,8 +113,15 @@ CREATE TABLE IF NOT EXISTS notifications(id INTEGER PRIMARY KEY, user_id INTEGER
 
 def seed_if_empty():
     db().executescript(SCHEMA)
+    # migrations (safe to re-run)
+    try: q("ALTER TABLE challenges ADD COLUMN sponsor TEXT")
+    except sqlite3.OperationalError: pass
+    # demo sponsor: show the sponsored model in action (never overwrites real data)
+    if not q1("SELECT 1 FROM challenges WHERE sponsor IS NOT NULL AND sponsor != ''"):
+        q("UPDATE challenges SET sponsor='INDOMIE' WHERE id=3")
+    commit()
     if q1("SELECT COUNT(*) c FROM users")["c"]:
-        commit(); return
+        return
     def user(un, dn, av, color, bio, admin=0):
         q("INSERT INTO users (username, display_name, pw, bio, avatar, color, is_admin, created_at) VALUES (?,?,?,?,?,?,?,?)",
           (un, dn, hash_pw("admin123" if admin else "demo1234"), bio, av, color, admin, now_iso(-30)))
@@ -266,6 +273,7 @@ def challenge_pub(r, me=None):
         "stage": r["stage"], "recreate_target": r["recreate_target"], "recreate_count": r["recreate_count"],
         "featured": bool(r["featured"]), "participants": participants, "qualified": qualified,
         "days_left": days_left, "created_at": r["created_at"],
+        "sponsor": (r["sponsor"] if "sponsor" in r.keys() else None),
         "creator": creator, "original_video": video_pub(orig, me) if orig else None, "champion": champ,
         "mine": mine,
     }
@@ -336,7 +344,21 @@ def home():
     champs = []
     for r in qa("SELECT * FROM challenges WHERE stage='champion' ORDER BY champion_at DESC LIMIT 6"):
         champs.append(challenge_pub(r, me))
-    return jsonify(hero=hero, live=live, beat=beat, trending=trending, discover=discover, champions=champs)
+    hero_feed = []
+    if feat:
+        hero_feed = [video_pub(r, me) for r in qa(
+            "SELECT * FROM videos WHERE challenge_id=? AND kind='recreate' AND status='approved' ORDER BY id DESC LIMIT 10", (feat["id"],))]
+    feed_create = [video_pub(r, me) for r in qa(
+        "SELECT * FROM videos WHERE kind='creation' AND status='approved' ORDER BY id DESC LIMIT 10")]
+    feed_recreate = [video_pub(r, me) for r in qa(
+        "SELECT * FROM videos WHERE kind='recreate' AND status='approved' ORDER BY id DESC LIMIT 10")]
+    feed_beatit = [video_pub(r, me) for r in qa(
+        "SELECT * FROM videos WHERE kind='beatit' AND status='approved' ORDER BY id DESC LIMIT 10")]
+    sponsored = [challenge_pub(r, me) for r in qa(
+        "SELECT * FROM challenges WHERE sponsor IS NOT NULL AND sponsor != '' ORDER BY id DESC")]
+    return jsonify(hero=hero, live=live, beat=beat, trending=trending, discover=discover, champions=champs,
+                   hero_feed=hero_feed, feed_create=feed_create, feed_recreate=feed_recreate,
+                   feed_beatit=feed_beatit, sponsored=sponsored)
 
 @app.get("/api/challenges")
 def challenges_list():
@@ -644,6 +666,17 @@ def admin_crown(u):
         notify(row["user_id"], "champion", f"{ch['code']} has a new champion: @{q1('SELECT username FROM users WHERE id=?',(r['user_id'],))['username']} ({r['score']:g}%). Records can be broken…", f"/challenge/{ch['id']}")
     commit()
     return jsonify(ok=True)
+
+@app.post("/api/admin/sponsor")
+@require_admin
+def admin_sponsor(u):
+    d = request.get_json(silent=True) or {}
+    ch = get_challenge(d.get("challenge_id", 0))
+    if not ch: return jsonify(error="Not found"), 404
+    sponsor = (d.get("sponsor") or "").strip()[:40] or None
+    q("UPDATE challenges SET sponsor=? WHERE id=?", (sponsor, ch["id"]))
+    commit()
+    return jsonify(ok=True, sponsor=sponsor)
 
 @app.get("/api/admin/challenges")
 @require_admin

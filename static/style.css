@@ -502,3 +502,70 @@ select.mini, .mini-btn{padding:8px 12px;border-radius:10px;background:var(--surf
   .hero-stats{gap:18px}
   .hstat .hv{font-size:24px}
 }
+
+/* ============================================================
+   v4 — snap decks, hero feed, records grid, sponsored
+   ============================================================ */
+/* sideways TikTok-style deck */
+.deck{position:relative;margin:2px -4px 8px}
+.deck-track{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;padding:8px 4px 6px;scrollbar-width:none}
+.deck-track::-webkit-scrollbar{display:none}
+.deck-card{flex:none;width:min(86vw,470px);scroll-snap-align:center;scroll-snap-stop:always}
+.deck-card .ch-card{width:100%}
+.deck-card .ch-thumb{aspect-ratio:16/10.5}
+.deck-card .ch-title{font-size:22px}
+.dk-btn{position:absolute;top:38%;z-index:6;width:42px;height:42px;border-radius:50%;border:1px solid var(--line2);
+  background:rgba(12,15,24,.8);backdrop-filter:blur(8px);color:var(--text);display:flex;align-items:center;justify-content:center;transition:.2s}
+.dk-btn:hover{background:var(--grad-fire);border-color:transparent;box-shadow:var(--glow-fire)}
+.dk-btn .ic{transition:.2s}
+.dk-prev{left:-6px}.dk-prev .ic{transform:rotate(180deg)}
+.dk-next{right:-6px}
+.dk-btn.off{opacity:.25;pointer-events:none}
+.deck-dots{display:flex;gap:6px;justify-content:center;margin-top:8px}
+.deck-dots span{width:7px;height:7px;border-radius:99px;background:var(--surface3);transition:.25s}
+.deck-dots span.on{width:22px;background:var(--grad-fire);box-shadow:0 0 10px rgba(255,110,50,.5)}
+
+/* hero extras */
+.hero-sound{position:absolute;right:14px;bottom:14px;z-index:4;width:40px;height:40px;border-radius:50%;
+  border:1px solid var(--line2);background:rgba(8,10,16,.66);backdrop-filter:blur(8px);color:var(--text);
+  display:flex;align-items:center;justify-content:center;transition:.2s}
+.hero-sound:hover{border-color:rgba(255,140,60,.5)}
+.hero-sound.on{background:var(--grad-fire);border-color:transparent}
+.hero-live{position:absolute;left:14px;bottom:14px;z-index:4;display:flex;align-items:center;gap:8px;
+  font-size:9.5px;font-weight:800;letter-spacing:2px;color:#e8ecf5;background:rgba(8,10,16,.6);
+  border:1px solid var(--line);border-radius:999px;padding:6px 12px;backdrop-filter:blur(8px)}
+.hero-feed{margin-top:22px;border-top:1px solid var(--line);padding-top:16px}
+.hf-label{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;letter-spacing:2px;color:var(--mut);margin-bottom:12px}
+.hf-label .ic{color:var(--fire-mid)}
+.feed-strip{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
+.feed-strip::-webkit-scrollbar{display:none}
+.feed-card{width:134px;flex:none;cursor:pointer;transition:.2s}
+.feed-card:hover{transform:translateY(-3px)}
+.fc-thumb{position:relative;aspect-ratio:9/12;border-radius:14px;overflow:hidden;background:#000;border:1px solid var(--line)}
+.fc-thumb video{width:100%;height:100%;object-fit:cover}
+.fc-thumb .veil{position:absolute;inset:0;background:linear-gradient(to top,rgba(5,7,12,.8),transparent 50%)}
+.fc-score{position:absolute;left:7px;bottom:7px}
+.fc-meta{display:flex;align-items:center;gap:6px;margin-top:7px;font-size:11.5px;font-weight:700;min-width:0}
+.fc-meta span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fc-meta em{font-style:normal;color:var(--dim);font-size:10px;margin-left:auto}
+
+/* sponsored */
+.ch-sponsor{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:800;letter-spacing:1.6px;color:var(--gold);
+  background:linear-gradient(90deg,rgba(245,197,24,.16),rgba(245,197,24,.04));border:1px solid rgba(245,197,24,.35);
+  border-radius:8px;padding:4px 9px;width:max-content;text-transform:uppercase}
+
+/* records grid */
+.records-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.records-card .rc-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.records-card .rc-title{font-family:var(--display);letter-spacing:1.2px;font-size:19px;line-height:1.2}
+.records-card .rc-holder{display:flex;align-items:center;gap:8px;font-size:13px}
+.records-card .rc-score{margin-left:auto;font-family:var(--display);font-size:26px;color:var(--gold);text-shadow:0 0 18px rgba(245,197,24,.35)}
+.records-card .rc-score span{font-size:13px}
+.records-card .rc-unb{display:flex;align-items:center;gap:6px;color:var(--mut);font-size:12px;font-weight:600}
+.records-card .rc-acts{display:flex;gap:8px;margin-top:4px}
+.records-card .rc-acts .btn{flex:1}
+
+@media (max-width:640px){
+  .dk-btn{display:none}
+  .deck-card{width:86vw}
+}

@@ -67,18 +67,21 @@ async function refreshMe() {
   try { const d = await api("/api/me"); ME = d.me; } catch (e) { ME = null; }
 }
 
-// ---------------- signature logo ----------------
+// ---------------- signature logo — THE BREAKTHROUGH MARK ----------------
+// Three ascending strokes of effort breaking through the record bar, igniting into a spark.
 let _logoN = 0;
-function logoSVG(size = 26) {
+function logoSVG(size = 28) {
   const id = "lg" + (++_logoN);
-  return `<svg class="logo-mark" width="${size}" height="${size}" viewBox="0 0 64 64" fill="none">
+  return `<svg class="logo-mark" width="${size}" height="${size}" viewBox="0 0 96 96" fill="none" aria-hidden="true">
     <defs><linearGradient id="${id}" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#FF4D2E"/><stop offset=".55" stop-color="#FF7A3C"/><stop offset="1" stop-color="#FFB300"/>
+      <stop offset="0" stop-color="#FF3D1F"/><stop offset=".5" stop-color="#FF7A3C"/><stop offset="1" stop-color="#FFC42E"/>
     </linearGradient></defs>
-    <rect x="9" y="38" width="10" height="18" rx="3" fill="url(#${id})" opacity=".5"/>
-    <rect x="25" y="28" width="10" height="28" rx="3" fill="url(#${id})" opacity=".78"/>
-    <rect x="41" y="18" width="10" height="38" rx="3" fill="url(#${id})"/>
-    <path d="M46 2c3.2 3.8 5.6 6.2 5.6 9.4a5.6 5.6 0 1 1-11.2 0C40.4 8.2 42.8 5.8 46 2z" fill="#FFB300"/>
+    <path d="M12 58H46" stroke="url(#${id})" stroke-width="7" stroke-linecap="round" opacity=".4"/>
+    <path d="M66 58H84" stroke="url(#${id})" stroke-width="7" stroke-linecap="round" opacity=".4"/>
+    <path d="M22 80 33 52" stroke="url(#${id})" stroke-width="10" stroke-linecap="round" opacity=".5"/>
+    <path d="M38 82 53 42" stroke="url(#${id})" stroke-width="10" stroke-linecap="round" opacity=".8"/>
+    <path d="M54 84 73 24" stroke="url(#${id})" stroke-width="11" stroke-linecap="round"/>
+    <path d="M77 5l3.2 8.8L89 17l-8.8 3.2L77 29l-3.2-8.8L65 17l8.8-3.2z" fill="#FFC42E"/>
   </svg>`;
 }
 const brandHTML = (size = 26) => `<span class="brand">${logoSVG(size)}<span class="wordmark">CREATE<span class="w-it">IT</span></span></span>`;
@@ -110,6 +113,8 @@ const ICONS = {
   upload: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4|m17 8-5-5-5 5|M12 3v12",
   star: "m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.2-6.2 3.2L7 14.2 2 9.3l6.9-1z",
   film: "M2 5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z|M7 3v18|M17 3v18|M2 8h5|M2 16h5|M17 8h5|M17 16h5",
+  volume2: "M11 5 6 9H2v6h4l5 4z|M15.5 8.5a5 5 0 0 1 0 7|M19 5a9.5 9.5 0 0 1 0 14",
+  volumeX: "M11 5 6 9H2v6h4l5 4z|m22 9-6 6|m16 9l6 6",
   send: "m22 2-7 20-4-9-9-4z|M22 2 11 13",
   share: "M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8|m16 6-4-4-4 4|M12 2v13",
   eye: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z|C12 12 3 0 0 0 1",
@@ -231,7 +236,7 @@ document.addEventListener("click", e => {
 });
 
 // ---------------- components ----------------
-function challengeCard(c) {
+function challengeCard(c, big = false) {
   const pct = c.recreate_target ? Math.min(100, Math.round(c.recreate_count / c.recreate_target * 100)) : 0;
   const barCls = c.stage === "champion" ? "t-gold" : "";
   let foot;
@@ -252,6 +257,7 @@ function challengeCard(c) {
       ${c.featured ? `<span class="corner-r"><span class="pill-mini pm-gold">${ic("star", 10)} FEATURED</span></span>` : ""}
     </div>
     <div class="ch-body">
+      ${c.sponsor ? `<span class="ch-sponsor">${ic("star", 10)} ${esc(c.sponsor)} × CREATEIT</span>` : ""}
       <span class="ch-code">${esc(c.code)}</span>
       <span class="ch-title">${esc(c.title)}</span>
       <span class="ch-by">Created by <b>@${esc(c.creator.username)}</b></span>
@@ -350,6 +356,10 @@ document.addEventListener("click", async e => {
   const vid = el.dataset.vid;
   try {
     if (act === "watch" || act === "open-video") { e.stopPropagation(); openPlayer(vid); }
+    else if (act === "hero-sound") {
+      const v = $("#hero-video");
+      if (v) { v.muted = !v.muted; el.innerHTML = ic(v.muted ? "volumeX" : "volume2", 16); el.classList.toggle("on", !v.muted); }
+    }
     else if (act === "close-player") closePlayer();
     else if (act === "share") { try { await navigator.clipboard.writeText(location.origin + "/#/video/" + PLAYER_VID); } catch (err) {} toast("Link copied — share the journey."); }
     else if (act === "like") {
@@ -376,6 +386,50 @@ function secHead(n, icon, title, sub, more) {
   return `<div class="sec"><span class="sec-n">${n}</span><h2>${ic(icon, 18)} ${title}</h2>${sub ? `<span class="sub">${sub}</span>` : ""}<span class="sec-rule"></span>${more ? `<a class="more" href="${more[1]}">${more[0]} ${ic("arrow", 13)}</a>` : ""}</div>`;
 }
 
+// sideways snap deck — TikTok energy, horizontal direction
+function deckOf(items, cardFn) {
+  const cards = items.map(cardFn).join("");
+  const dots = items.map((_, i) => `<span class="${i === 0 ? "on" : ""}"></span>`).join("");
+  return `<div class="deck">
+    <button class="dk-btn dk-prev" type="button" aria-label="Previous">${ic("arrow", 18)}</button>
+    <div class="deck-track">${cards}</div>
+    <button class="dk-btn dk-next" type="button" aria-label="Next">${ic("arrow", 18)}</button>
+    <div class="deck-dots">${dots}</div>
+  </div>`;
+}
+function bindDecks() {
+  $$(".deck").forEach(deck => {
+    if (deck.dataset.bound) return; deck.dataset.bound = "1";
+    const track = deck.querySelector(".deck-track");
+    const dots = [...deck.querySelectorAll(".deck-dots span")];
+    const step = () => (track.firstElementChild ? track.firstElementChild.offsetWidth + 16 : 300);
+    const upd = () => {
+      const i = Math.max(0, Math.min(dots.length - 1, Math.round(track.scrollLeft / step())));
+      dots.forEach((d, j) => d.classList.toggle("on", j === i));
+      deck.querySelector(".dk-prev").classList.toggle("off", track.scrollLeft < 20);
+      deck.querySelector(".dk-next").classList.toggle("off", track.scrollLeft > track.scrollWidth - track.clientWidth - 20);
+    };
+    track.addEventListener("scroll", () => requestAnimationFrame(upd), { passive: true });
+    deck.querySelector(".dk-prev").addEventListener("click", () => track.scrollBy({ left: -step(), behavior: "smooth" }));
+    deck.querySelector(".dk-next").addEventListener("click", () => track.scrollBy({ left: step(), behavior: "smooth" }));
+    upd();
+  });
+}
+
+const feedCard = v => `<div class="feed-card" data-act="open-video" data-vid="${v.id}">
+  <div class="fc-thumb">${thumb(v)}<div class="veil"></div><div class="fc-score">${scoreBadge(v.score)}</div></div>
+  <div class="fc-meta">${avatar(v.owner, "sm")}<span>@${esc(v.owner.username)}</span>${v.attempt_no ? `<em>#${v.attempt_no}</em>` : ""}</div>
+</div>`;
+
+const recordCard = c => `<div class="records-card">
+  <div class="rc-top"><span class="rc-code">${esc(c.code)}</span>${stagePill("champion")}</div>
+  <div class="rc-title">${esc(c.title)}</div>
+  <div class="rc-holder">${avatar(c.champion.user, "sm")} <b>@${esc(c.champion.user.username)}</b><span class="rc-score">${c.champion.score}<span>%</span></span></div>
+  <div class="rc-unb">${ic("clock", 12)} unbeaten for ${c.champion.unbeaten_days} day${c.champion.unbeaten_days === 1 ? "" : "s"}</div>
+  <div class="rc-acts"><button class="btn btn-sm btn-gold" data-act="watch" data-vid="${c.champion.video_id}">${ic("play", 12)} THE WIN</button>
+  <button class="btn btn-sm" data-nav="/challenge/${c.id}">VIEW ${ic("arrow", 12)}</button></div>
+</div>`;
+
 async function viewHome() {
   const d = await api("/api/home");
   const h = d.hero;
@@ -386,15 +440,18 @@ async function viewHome() {
     <span class="loop-step b">BEAT IT</span>
     <span class="loop-cap">What can you do that is uniquely yours? Followers don't matter here — the challenge does.</span>
   </div>
+
   ${h ? `
   ${secHead("01", "crown", "CREATEIT OF THE WEEK", "the benchmark everyone is chasing")}
   <div class="hero">
     ${h.featured ? `<div class="week-ribbon"><span class="wr-1">${ic("star", 11)} CREATOR OF THE WEEK</span><span class="wr-2">@${esc(h.creator.username)}</span></div>` : ""}
     <div class="hero-media" data-act="watch" data-vid="${h.original_video.id}" style="cursor:pointer">
-      <video src="${h.original_video.src}" autoplay muted loop playsinline preload="auto"></video>
+      <video id="hero-video" src="${h.original_video.src}" autoplay muted loop playsinline preload="auto"></video>
+      <button class="hero-sound" data-act="hero-sound" title="Toggle sound">${ic("volumeX", 16)}</button>
+      <div class="hero-live"><span class="live-dot"></span> NOW PLAYING · ON REPEAT</div>
     </div>
     <div class="hero-body">
-      <span class="hero-kicker"><span class="live-dot"></span> ${esc(h.code)} · THE BENCHMARK IS SET</span>
+      <span class="hero-kicker"><span class="live-dot"></span> ${esc(h.code)} ${h.sponsor ? `· ${esc(h.sponsor.toUpperCase())} × CREATEIT` : ""} · THE BENCHMARK IS SET</span>
       <div class="hero-title">${esc(h.title)}</div>
       <div class="hero-sub">${esc(h.description)}</div>
       <div class="hero-stats">
@@ -410,24 +467,35 @@ async function viewHome() {
         ${h.stage === "recreate_it" ? `<button class="btn btn-teal" data-nav="/create?kind=recreate&challenge=${h.id}">${ic("refresh", 14)} RECREATE IT</button>` : ""}
         <button class="btn btn-ghost" data-nav="/challenge/${h.id}">CHALLENGE PAGE ${ic("arrow", 14)}</button>
       </div>
+      ${d.hero_feed.length ? `
+      <div class="hero-feed">
+        <div class="hf-label">${ic("flame", 13)} LATEST SUBMISSIONS ON ${esc(h.code)}</div>
+        <div class="feed-strip">${d.hero_feed.map(feedCard).join("")}</div>
+      </div>` : ""}
     </div>
   </div>` : `<div class="empty">No live challenges yet. Be the first to CREATE IT.</div>`}
 
-  ${secHead("02", "flame", "LIVE CHALLENGES", "in the RECREATE IT stage", ["See all", "#/challenges"])}
-  ${d.live.length ? `<div class="hscroll">${d.live.map(challengeCard).join("")}</div>` : `<div class="empty">Nothing live right now.</div>`}
+  ${d.sponsored.length ? `
+  ${secHead("02", "star", "SPONSORED CHALLENGES", "partners fuel the prizes")}
+  <div class="hscroll">${d.sponsored.map(c => challengeCard(c, true)).join("")}</div>` : ""}
 
-  ${secHead("03", "zap", "BEAT IT", "one final submission. surpass the original.")}
-  ${d.beat.length ? `<div class="hscroll">${d.beat.map(challengeCard).join("")}</div>` : `<div class="empty">No challenges in Beat It right now — recreate something first.</div>`}
+  ${secHead(d.sponsored.length ? "03" : "02", "flame", "LIVE CHALLENGES", "swipe through the arena", ["See all", "#/challenges"])}
+  ${d.live.length ? deckOf(d.live, c => `<div class="deck-card">${challengeCard(c)}</div>`) : `<div class="empty">Nothing live right now.</div>`}
 
-  ${secHead("04", "target", "TRENDING ATTEMPTS", "the highest-scored recreations on the platform")}
-  ${d.trending.length ? `<div class="grid3">${d.trending.map(v => videoCard(v)).join("")}</div>` : ""}
+  ${secHead("04", "film", "CREATE IT", "fresh originals — tomorrow's benchmarks")}
+  ${d.feed_create.length ? `<div class="grid3">${d.feed_create.map(v => videoCard(v)).join("")}</div>` : `<div class="empty">Scouts are watching. Upload something uniquely yours.</div>`}
 
-  ${secHead("05", "globe", "DISCOVER", "exceptional creations — tomorrow's challenges")}
-  ${d.discover.length ? `<div class="grid3">${d.discover.map(v => videoCard(v)).join("")}</div>`
-    : `<div class="empty">Scouts are watching. Upload something uniquely yours — <a href="#/create" style="color:var(--fire2);font-weight:700">CREATE IT</a></div>`}
+  ${secHead("05", "refresh", "RECREATE IT", "the most recent attempts from the community")}
+  ${d.feed_recreate.length ? `<div class="grid3">${d.feed_recreate.map(v => videoCard(v)).join("")}</div>` : `<div class="empty">Nobody has attempted yet. Be first.</div>`}
 
-  ${secHead("06", "crown", "CHAMPIONS", "", ["Records", "#/leaderboard"])}
-  ${d.champions.length ? `<div class="hscroll">${d.champions.map(challengeCard).join("")}</div>` : ""}
+  ${secHead("06", "zap", "BEAT IT", "final submissions — one shot to surpass the original")}
+  ${d.feed_beatit.length ? `<div class="grid3">${d.feed_beatit.map(v => videoCard(v)).join("")}</div>` : `<div class="empty">No final submissions yet — qualify at 100% first.</div>`}
+
+  ${d.champions.length ? `
+  ${secHead("07", "disc", "UNBEATEN RECORDS", "nobody has broken these marks yet")}
+  <div class="records-grid">${d.champions.map(recordCard).join("")}</div>
+  ${secHead("08", "crown", "CHAMPIONS", "", ["Full ranks", "#/leaderboard"])}
+  <div class="hscroll">${d.champions.map(challengeCard).join("")}</div>` : ""}
 
   <div class="quote">“Maybe I don't have millions of followers. Maybe I'm not famous.<br>But I have something that is <em>uniquely mine</em>.”</div>`;
 }
@@ -806,6 +874,10 @@ async function viewAdmin() {
     $$("[data-feature]").forEach(b => b.onclick = async () => {
       try { await api("/api/admin/featured", { method: "POST", json: { challenge_id: +b.dataset.feature } }); toast("Now the Creator of the Week feature."); route(); } catch (e) { toast(e.message, true); }
     });
+    $$("[data-sponsor]").forEach(b => b.onclick = async () => {
+      const sponsor = $(`#sponsor-${b.dataset.sponsor}`).value.trim();
+      try { await api("/api/admin/sponsor", { method: "POST", json: { challenge_id: +b.dataset.sponsor, sponsor } }); toast(sponsor ? `${sponsor} × CREATEIT is now live on the home page.` : "Sponsor removed."); route(); } catch (e) { toast(e.message, true); }
+    });
     $$("[data-crown]").forEach(b => b.onclick = async () => {
       try { await api("/api/admin/crown", { method: "POST", json: { challenge_id: +b.dataset.crown, video_id: +b.dataset.vid } }); toast("Champion crowned. History written."); route(); } catch (e) { toast(e.message, true); }
     });
@@ -870,6 +942,11 @@ async function viewAdmin() {
         <select class="mini" data-stage="${c.id}">${stages.map(s => `<option value="${s}" ${c.stage === s ? "selected" : ""}>${STAGE_META[s].icon} ${STAGE_META[s].label}</option>`).join("")}</select>
         <input class="score-input" data-target="${c.id}" type="number" value="${c.recreate_target}" min="1" title="Recreate target" style="width:90px">
         <button class="mini-btn" data-feature="${c.id}">${ic("star",12)} Creator of the Week</button>
+      </div>
+      <div style="width:100%;display:flex;gap:8px;align-items:center;border-top:1px dashed var(--line2);padding-top:9px;flex-wrap:wrap">
+        <input class="score-input" id="sponsor-${c.id}" value="${esc(c.sponsor || "")}" placeholder="Sponsor name (blank = none)" style="width:230px;text-align:left">
+        <button class="mini-btn" data-sponsor="${c.id}">${ic("star",12)} SET SPONSOR</button>
+        ${c.sponsor ? `<span class="pill-mini pm-gold">${esc(c.sponsor)} × CREATEIT is live</span>` : ""}
       </div>
       ${c.stage === "beat_it" && c.beatits.length ? `<div style="width:100%;display:flex;gap:8px;flex-wrap:wrap;border-top:1px dashed var(--line2);padding-top:9px">
         ${c.beatits.map(b => `<span class="chip" style="cursor:default">@${esc(b.owner.username)} · ${b.score != null ? b.score + "%" : "unscored"}
@@ -946,6 +1023,7 @@ async function route() {
     observeReveals();
     runCountUps();
     bindTilt();
+    bindDecks();
   } catch (err) {
     app.innerHTML = `<div class="empty">⚠️ ${esc(err.message)}</div>`;
   }
