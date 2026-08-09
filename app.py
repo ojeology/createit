@@ -235,9 +235,11 @@ def user_pub(uid_or_row):
 def video_pub(r, me=None):
     owner = user_pub(r["user_id"])
     ch = q1("SELECT * FROM challenges WHERE id=?", (r["challenge_id"],)) if r["challenge_id"] else None
+    stem = os.path.splitext(r["file"])[0]
+    poster = f"/uploads/posters/{stem}.jpg" if os.path.exists(os.path.join(UPLOADS, "posters", stem + ".jpg")) else None
     return {
         "id": r["id"], "kind": r["kind"], "title": r["title"], "description": r["description"],
-        "src": "/uploads/" + r["file"], "status": r["status"], "score": r["score"],
+        "src": "/uploads/" + r["file"], "poster": poster, "status": r["status"], "score": r["score"],
         "attempt_no": r["attempt_no"], "nominated": bool(r["nominated"]), "created_at": r["created_at"],
         "owner": owner,
         "challenge": {"id": ch["id"], "code": ch["code"], "title": ch["title"], "stage": ch["stage"]} if ch else None,
@@ -484,6 +486,20 @@ def notifications_read(u):
     return jsonify(ok=True)
 
 # ---------------------------------------------------------------- upload
+def make_poster(saved_path, fname):
+    """Best-effort poster frame extraction (keeps pages fast)."""
+    try:
+        import imageio_ffmpeg, subprocess
+        ff = imageio_ffmpeg.get_ffmpeg_exe()
+        stem = os.path.splitext(fname)[0]
+        out = os.path.join(UPLOADS, "posters", stem + ".jpg")
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        subprocess.run([ff, "-hide_banner", "-loglevel", "error", "-ss", "0.7", "-i", saved_path,
+                        "-frames:v", "1", "-vf", "scale=360:-2", "-q:v", "4", out, "-y"],
+                       timeout=40, check=False)
+    except Exception:
+        pass
+
 @app.post("/api/upload")
 @require_user
 def upload(u):
@@ -496,7 +512,9 @@ def upload(u):
     desc = (request.form.get("description") or "").strip()[:400]
     cid = request.form.get("challenge_id", type=int)
     fname = f"{uuid.uuid4().hex}.{ext}"
-    f.save(os.path.join(UPLOADS, fname))
+    dest = os.path.join(UPLOADS, fname)
+    f.save(dest)
+    make_poster(dest, fname)
 
     if kind == "recreate":
         ch = get_challenge(cid) if cid else None

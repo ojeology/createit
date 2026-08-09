@@ -59,7 +59,9 @@ function avatar(u, cls = "") {
 }
 
 function thumb(v, extra = "") {
-  return `<video src="${v.src}#t=0.7" preload="metadata" muted playsinline ${extra}></video>`;
+  return v.poster
+    ? `<img src="${v.poster}" alt="" loading="lazy" ${extra}>`
+    : `<video src="${v.src}#t=0.7" preload="metadata" muted playsinline ${extra}></video>`;
 }
 
 let ME = null;
@@ -380,6 +382,7 @@ document.addEventListener("click", async e => {
       el.classList.toggle("btn-fire", d.liked);
       el.querySelector("span").textContent = d.likes;
       el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
+      if (d.liked) burst(el);
     }
     else if (act === "send-comment") {
       const inp = $("#pl-comment-input");
@@ -428,6 +431,45 @@ function bindDecks() {
   });
 }
 
+// sports ticker (ESPN-style live wire)
+function tickerHTML(d) {
+  const items = [];
+  (d.trending || []).slice(0, 5).forEach(v => {
+    if (v.score != null && v.challenge) items.push(`<b>@${esc(v.owner.username)}</b> SCORED <span class="g">${v.score}%</span> ON ${esc(v.challenge.code)}`);
+  });
+  (d.champions || []).forEach(c => items.push(`<b>@${esc(c.champion.user.username)}</b> HOLDS THE ${esc(c.code)} RECORD AT <span class="g">${c.champion.score}%</span>`));
+  (d.live || []).forEach(c => items.push(`${esc(c.code)} IS LIVE — <span class="g">${c.recreate_count.toLocaleString()}/${c.recreate_target.toLocaleString()}</span> RECREATIONS`));
+  if (!items.length) return "";
+  const track = items.map(i => `<span class="tk-item">${i}</span>`).join("");
+  return `<div class="ticker"><span class="tk-label"><span class="live-dot"></span> LIVE WIRE</span><div class="tk-mask"><div class="tk-track">${track}${track}</div></div></div>`;
+}
+
+// hero parallax
+let _pxRaf = null;
+window.addEventListener("scroll", () => {
+  if (_pxRaf) return;
+  _pxRaf = requestAnimationFrame(() => {
+    _pxRaf = null;
+    const hm = $(".hero-media");
+    if (!hm) return;
+    const y = Math.min(window.scrollY, 700);
+    hm.style.transform = `translateY(${(y * 0.14).toFixed(1)}px)`;
+  });
+}, { passive: true });
+
+// like burst particles
+function burst(btn) {
+  for (let i = 0; i < 8; i++) {
+    const p = document.createElement("span");
+    p.className = "burst-p";
+    const a = (i / 8) * Math.PI * 2 + Math.random() * 0.5, r = 22 + Math.random() * 14;
+    p.style.setProperty("--dx", Math.cos(a) * r + "px");
+    p.style.setProperty("--dy", Math.sin(a) * r + "px");
+    btn.appendChild(p);
+    setTimeout(() => p.remove(), 750);
+  }
+}
+
 const feedCard = v => `<div class="feed-card" data-act="open-video" data-vid="${v.id}">
   <div class="fc-thumb">${thumb(v)}<div class="veil"></div><div class="fc-score">${scoreBadge(v.score)}</div></div>
   <div class="fc-meta">${avatar(v.owner, "sm")}<span>@${esc(v.owner.username)}</span>${v.attempt_no ? `<em>#${v.attempt_no}</em>` : ""}</div>
@@ -454,6 +496,7 @@ async function viewHome() {
     <span class="loop-step b">BEAT IT</span>
     <span class="loop-cap">What can you do that is uniquely yours? Followers don't matter here — the challenge does.</span>
   </div>
+  ${tickerHTML(d)}
 
   ${h ? `
   ${secHead("01", "crown", "CREATEIT OF THE WEEK", "the benchmark everyone is chasing")}
@@ -560,10 +603,34 @@ async function viewChallenge(id) {
     else if (!m?.qualified) cta = `<button class="btn" disabled title="Reach 100% in Recreate It first">${ic("lock",14)} QUALIFY AT 100% FIRST</button>`;
   }
   const champ = c.champion;
+  const top = d.leaderboard[0];
+  const fightRight = top ? `
+    <div class="fc-side right" data-nav="/user/${top.user.username}" style="cursor:pointer">
+      ${avatar(top.user)}
+      <span class="fc-name">${esc(top.user.display_name)}</span>
+      <span class="fc-handle">@${esc(top.user.username)}</span>
+      <span class="fc-scoreline">${top.best}%</span>
+      <span class="fc-role">TOP CHALLENGER · ${top.attempts} ATTEMPTS</span>
+    </div>` : `
+    <div class="fc-side right">
+      <span class="avatar" style="background:var(--surface3);color:var(--dim)">?</span>
+      <span class="fc-name" style="color:var(--mut)">THE ARENA AWAITS</span>
+      <span class="fc-role">NO ATTEMPTS YET — BE FIRST</span>
+    </div>`;
   return `
   <div class="page-head">
     <span class="crumb">CHALLENGE / <b>${esc(c.code)}</b></span>
-    <h1 class="big-title">${esc(c.title)}</h1>
+    <div class="fight-card">
+      <div class="fc-side left" data-nav="/user/${c.creator.username}" style="cursor:pointer">
+        ${avatar(c.creator)}
+        <span class="fc-name">${esc(c.creator.display_name)}</span>
+        <span class="fc-handle">@${esc(c.creator.username)}</span>
+        <span class="fc-role">ORIGINAL CREATOR · THE BENCHMARK</span>
+      </div>
+      <div class="fc-mid"><span class="fc-vs">VS</span><span class="fc-stage">${stagePill(c.stage)}</span></div>
+      ${fightRight}
+    </div>
+    <h1 class="big-title mask-reveal"><span>${esc(c.title)}</span></h1>
     <div class="meta-row">${stagePill(c.stage)}
       <span class="user-chip" data-nav="/user/${c.creator.username}">${avatar(c.creator, "sm")} <b>@${esc(c.creator.username)}</b> · original creator</span>
       ${c.stage === "recreate_it" && c.days_left != null ? `<span>⏳ ${c.days_left} days left</span>` : ""}
@@ -585,7 +652,7 @@ async function viewChallenge(id) {
       <span class="pill-mini pm-violet">THE BENCHMARK</span>
       <h3>THE ORIGINAL CREATION</h3>
       <p>${esc(c.description || "Recreate this creation exactly as it was performed.")}</p>
-      <p style="margin-top:8px;color:var(--text);font-size:13px">${ic("target", 13)} <b>${c.recreate_count.toLocaleString()}</b> / ${c.recreate_target.toLocaleString()} recreations · ${c.participants} participants · ${c.qualified} qualified for Beat It</p>
+      <p style="margin-top:8px;color:var(--text);font-size:13px">${ic("target", 13)} <b data-count="${c.recreate_count}">0</b> / ${c.recreate_target.toLocaleString()} recreations · <span data-count="${c.participants}">0</span> participants · <span data-count="${c.qualified}">0</span> qualified for Beat It</p>
       <div class="progress t-teal" style="max-width:380px;margin-top:10px"><div style="width:${Math.min(100, Math.round(c.recreate_count / c.recreate_target * 100))}%"></div></div>
     </div>
     <div style="display:flex;flex-direction:column;gap:9px">
@@ -598,7 +665,7 @@ async function viewChallenge(id) {
     ${m.beatit_submitted ? `<span class="pill-mini pm-fire">${ic("zap",10)} FINAL SUBMISSION IN</span>` : ""}</div></div>` : ""}
   <div class="sec"><h2>${ic("trophy",18)} TOP PARTICIPANTS</h2><span class="sub">best recreate score per person</span><span class="sec-rule"></span></div>
   ${d.leaderboard.length ? d.leaderboard.map((b, i) => `
-    <div class="board-row"><span class="rank">${i + 1}</span>${avatar(b.user, "sm")}
+    <div class="board-row ${i < 3 ? "pod-" + (i + 1) : ""}"><span class="rank">${i + 1}</span>${avatar(b.user, "sm")}
       <div class="mid"><div class="t" data-nav="/user/${b.user.username}" style="cursor:pointer">@${esc(b.user.username)} · ${esc(b.user.display_name)}</div>
       <div class="s">${b.attempts} attempt${b.attempts === 1 ? "" : "s"} ${b.qualified ? `· ${ic("check", 10)} Beat It qualified` : ""}</div></div>
       ${scoreBadge(b.best)}
@@ -1016,8 +1083,17 @@ const VIEWS = {
   "/register": (q) => viewAuth("register"),
 };
 
+function routeLine() {
+  let l = $("#routeline");
+  if (!l) { l = document.createElement("div"); l.id = "routeline"; document.body.appendChild(l); }
+  l.className = ""; void l.offsetWidth;
+  l.style.width = "0"; l.classList.add("go");
+  requestAnimationFrame(() => { l.style.width = "72%"; });
+  setTimeout(() => { l.classList.add("done"); setTimeout(() => l.classList.add("hide"), 220); }, 350);
+}
 async function route() {
   if (PLAYER_OPEN) closePlayer();
+  routeLine();
   const raw = (location.hash || "#/").slice(1);
   const [path, qs] = raw.split("?");
   const query = new URLSearchParams(qs || "");
@@ -1038,6 +1114,7 @@ async function route() {
       html = `<div class="empty">Lost in the arena. <a href="#/" style="color:var(--fire2)">Go home</a></div>`;
     }
     app.innerHTML = html;
+    app.classList.remove("view-in"); void app.offsetWidth; app.classList.add("view-in");
     observeReveals();
     runCountUps();
     bindTilt();
