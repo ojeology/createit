@@ -680,7 +680,7 @@ async function viewHome() {
   ${h ? `
   <div class="hero-stage">
     <div class="hero-media vid-frame" data-act="watch" data-vid="${h.original_video.id}" data-vlist="home-hero" style="cursor:pointer">
-      <video id="hero-video" src="${h.original_video.src}" poster="${h.original_video.poster || ""}" autoplay muted loop playsinline preload="auto"></video>
+      <video id="hero-video" src="${h.original_video.src}" poster="${h.original_video.poster || ""}" autoplay loop playsinline preload="auto"></video>
       <div class="hero-grad"></div>
       <div class="hero-top">
         <span class="hero-flag">${ic("crown", 12)} CREATEIT OF THE WEEK · ${esc(h.code)}</span>
@@ -1560,11 +1560,27 @@ async function viewSettings() {
       $$(".app-opt").forEach(x => x.classList.toggle("active", x === o));
       toast(`Theme set to ${o.dataset.theme.toUpperCase()}`);
     }));
+    // avatar + color live pickers
+    let pickFace = ME.avatar, pickColor = ME.color;
+    const pv = $("#set-avatar-preview");
+    const refreshPv = () => { if (pv) { pv.textContent = pickFace; pv.style.background = pickColor; } };
+    $$("#set-faces .set-face").forEach(b => b.addEventListener("click", () => {
+      pickFace = b.dataset.face;
+      $$("#set-faces .set-face").forEach(x => x.classList.toggle("on", x === b));
+      refreshPv();
+    }));
+    $$("#set-colors .set-color").forEach(b => b.addEventListener("click", () => {
+      pickColor = b.dataset.c;
+      $$("#set-colors .set-color").forEach(x => x.classList.toggle("on", x === b));
+      refreshPv();
+    }));
     $("#set-save-acct")?.addEventListener("click", async () => {
       try {
         const d = await api("/api/me/update", { method: "POST", json: {
-          display_name: $("#set-name").value.trim(), bio: $("#set-bio").value.trim() } });
-        ME = { ...ME, ...d.me }; toast("Account saved."); renderChrome();
+          display_name: $("#set-name").value.trim(), bio: $("#set-bio").value.trim(),
+          username: ($("#set-username").value.trim().toLowerCase() || undefined),
+          avatar: pickFace, color: pickColor } });
+        ME = { ...ME, ...d.me }; toast("Account saved."); renderChrome(); refreshMe();
       } catch (err) { toast(err.message, true); }
     });
     $("#set-save-pw")?.addEventListener("click", async () => {
@@ -1591,9 +1607,19 @@ async function viewSettings() {
 
   ${secHead("", "gear", "ACCOUNT", "")}
   <div class="set-card">
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px">
+      <span class="avatar lg" id="set-avatar-preview" style="background:${ME.color};font-size:34px">${ME.avatar}</span>
+      <div style="font-size:12.5px;color:var(--ink3)">This is how you appear across CreateIt.</div>
+    </div>
     <div class="field"><label>DISPLAY NAME</label><input class="input" id="set-name" value="${esc(ME.display_name)}" maxlength="40"></div>
+    <div class="field"><label>USERNAME</label><input class="input" id="set-username" value="${esc(ME.username)}" maxlength="20" placeholder="3–20 letters/numbers"></div>
     <div class="field"><label>BIO</label><textarea class="input" id="set-bio" maxlength="160" placeholder="What makes you uniquely you?">${esc(ME.bio || "")}</textarea></div>
-    <div class="field"><label>USERNAME</label><input class="input" value="@${esc(ME.username)}" disabled style="opacity:.6"></div>
+    <div class="field"><label>PROFILE PICTURE</label>
+      <div class="set-faces" id="set-faces">${(window.SET_FACES||["😎","🤩","😊","😄","😇","🙂","🤗","😜","🥳","🤓","😏","😌","🕺","💃","🧑‍🎤","👩‍🎤"]).map(f => `<button type="button" class="set-face ${f===ME.avatar?"on":""}" data-face="${f}">${f}</button>`).join("")}</div>
+    </div>
+    <div class="field"><label>RING COLOR</label>
+      <div class="set-colors" id="set-colors">${["#FF4D2E","#22D3A5","#7C5CFF","#FFB300","#5B8CFF","#FF6FB2"].map(c => `<button type="button" class="set-color ${c===ME.color?"on":""}" data-c="${c}" style="background:${c}"></button>`).join("")}</div>
+    </div>
     <button class="btn btn-fire btn-sm" id="set-save-acct">SAVE ACCOUNT</button>
   </div>
 
@@ -2113,6 +2139,30 @@ function updateBackBtn(path) {
   bb.style.display = show ? "inline-flex" : "none";
   bb.classList.toggle("show", show);
 }
+function heroSoundArm() {
+  const hv = $("#hero-video");
+  if (!hv) return;
+  hv.muted = false;
+  const btnIcon = on => { const b = document.querySelector(".p-sound"); if (b) { b.innerHTML = ic(on ? "volume2" : "volumeX", 16); b.classList.toggle("on", on); } };
+  let armed = false;
+  const armUnmute = () => {
+    if (armed) return; armed = true;
+    const onFirst = () => {
+      document.removeEventListener("pointerdown", onFirst);
+      hv.muted = false;
+      hv.play().catch(() => {});
+      btnIcon(true);
+    };
+    document.addEventListener("pointerdown", onFirst);
+  };
+  const p = hv.play();
+  if (p) p.then(() => btnIcon(true)).catch(() => {
+    hv.muted = true;                     // OS blocked audible autoplay — keep the video moving
+    hv.play().catch(() => {});
+    armUnmute();                         // sound switches on at the first touch, automatically
+  });
+}
+
 function routeLine() {
   let l = $("#routeline");
   if (!l) { l = document.createElement("div"); l.id = "routeline"; document.body.appendChild(l); }
@@ -2168,7 +2218,7 @@ async function route() {
     }
     app.innerHTML = html;
     app.classList.remove("view-in"); void app.offsetWidth; app.classList.add("view-in");
-    const hv = $("#hero-video"); if (hv) mountVid(hv);
+    const hv = $("#hero-video"); if (hv) { mountVid(hv); heroSoundArm(); }
     observeReveals();
     runCountUps();
     bindTilt();

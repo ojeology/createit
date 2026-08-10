@@ -691,7 +691,22 @@ def me_update(u):
     d = request.get_json(silent=True) or {}
     dn = (d.get("display_name") or "").strip()[:40]
     bio = (d.get("bio") or "").strip()[:160]
-    q("UPDATE users SET display_name=?, bio=? WHERE id=?", (dn or u["display_name"], bio, u["id"]))
+    avatar = (d.get("avatar") or "").strip()[:8]
+    color = (d.get("color") or "").strip()[:9]
+    palette = ["#FF4D2E", "#22D3A5", "#7C5CFF", "#FFB300", "#5B8CFF", "#FF6FB2"]
+    sets, args = ["display_name=?", "bio=?"], [dn or u["display_name"], bio]
+    if avatar: sets.append("avatar=?"); args.append(avatar)
+    if color in palette: sets.append("color=?"); args.append(color)
+    un = (d.get("username") or "").strip().lower()
+    if un and un != u["username"]:
+        import re as _re
+        if not _re.fullmatch(r"[a-z0-9_]{3,20}", un):
+            return jsonify(error="Username: 3–20 characters, letters/numbers/underscore only"), 400
+        if q1("SELECT 1 FROM users WHERE username=?", (un,)):
+            return jsonify(error="That username is already taken"), 400
+        sets.append("username=?"); args.append(un)
+    args.append(u["id"])
+    q(f"UPDATE users SET {', '.join(sets)} WHERE id=?", tuple(args))
     commit()
     return jsonify(ok=True, me=user_pub(u["id"]))
 
@@ -756,7 +771,7 @@ def upload(u):
         if not ch: return jsonify(error="Pick a challenge"), 400
         if ch["stage"] != "recreate_it": return jsonify(error=f"{ch['code']} is not in the RECREATE IT stage"), 400
         n = q1("SELECT COUNT(*) c FROM videos WHERE challenge_id=? AND user_id=? AND kind='recreate'", (cid, u["id"]))["c"] + 1
-        q("INSERT INTO videos (user_id, kind, challenge_id, title, description, file, status, attempt_no, created_at) VALUES (?,?,?,?,?,?, 'pending', ?, ?)",
+        q("INSERT INTO videos (user_id, kind, challenge_id, title, description, file, status, attempt_no, created_at) VALUES (?,?,?,?,?,?, 'approved', ?, ?)",
           (u["id"], "recreate", cid, title or f"Attempt #{n}", desc, fname, n, now_iso()))
         vid = q1("SELECT last_insert_rowid() id")["id"]
         if ch["creator_id"] != u["id"]:
@@ -780,14 +795,14 @@ def upload(u):
             notify(ch["creator_id"], "beatit", f"@{u['username']} submitted a Beat It final on {ch['code']}. Your benchmark is under attack.", f"/challenge/{cid}")
         commit()
         return jsonify(ok=True, video_id=vid, message="Final submission locked in. One shot. Make it count.")
-    # creation / self-nomination — enters REVIEW; admin approval required before it goes live
+    # creation / self-nomination — publishes instantly; admins can still moderate afterward
     nominated = 1 if request.form.get("nominated") else 0
-    q("INSERT INTO videos (user_id, kind, title, description, file, status, nominated, created_at) VALUES (?,?,?,?,?,'pending',?,?)",
+    q("INSERT INTO videos (user_id, kind, title, description, file, status, nominated, created_at) VALUES (?,?,?,?,?,'approved',?,?)",
       (u["id"], "creation", title or "Untitled creation", desc, fname, nominated, now_iso()))
     vid = q1("SELECT last_insert_rowid() id")["id"]
-    notify(u["id"], "review", f"“{title or 'Your creation'}” entered CreateIt review. You'll be notified the moment it's approved.", "/notifications")
+    notify(u["id"], "review", f"“{title or 'Your creation'}” is live in Discover. The Arena is watching.", "/discover")
     commit()
-    return jsonify(ok=True, video_id=vid, message="Submitted for CreateIt review — approval required before it goes live.")
+    return jsonify(ok=True, video_id=vid, message="Your creation is live in Discover — the Arena is watching.")
 
 # ---------------------------------------------------------------- discovery architecture
 @app.get("/api/categories")

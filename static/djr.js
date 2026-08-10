@@ -118,7 +118,8 @@ function djArmPager() {
     if (DG.animating) { if (DG.finish) DG.finish(); else return; }
     DG.down = true; DG.sx = e.clientX; DG.sy = e.clientY; tapX = e.clientX; tapY = e.clientY;
     DG.dx = 0; DG.t0 = performance.now(); DG.axis = null;
-    djSetX(-djTrackW(), false);
+    DG.W = djTrackW();
+    djSetX(-DG.W, false);
   }, { passive: true });
   track.addEventListener("pointermove", e => {
     if (!DG.down || DG.animating) return;
@@ -126,14 +127,14 @@ function djArmPager() {
     if (DG.axis === null && (Math.abs(dx) > 7 || Math.abs(dy) > 7)) DG.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
     if (DG.axis !== "x") return;
     DG.dx = dx;
-    djSetX(-djTrackW() + dx, false);
+    djSetX(-(DG.W || djTrackW()) + dx, false);
   }, { passive: true });
   const finish = () => {
     if (!DG.down) return;
     DG.down = false;
     if (DG.axis === null) { djHandleTap(); djCenter(); return; }
     if (DG.axis !== "x" || DG.animating) { djCenter(); return; }
-    const W = djTrackW();
+    const W = DG.W || djTrackW();
     const dt = Math.max(1, performance.now() - DG.t0);
     const vel = Math.abs(DG.dx) / dt;
     const far = Math.abs(DG.dx) > W * 0.20;
@@ -251,13 +252,20 @@ function djActiveVideo() {
 async function djEnsureNext() {
   if (DJ.videos[DJ.idx + 1]) return;
   if (!djCanShuffle()) return;
-  if (!DJ.pool.length && !DJ.done && !DJ.loading) await djRefillPool();
-  if (DJ.pool.length) DJ.videos.push(DJ.pool.shift());
+  let guard = 0;
+  while (!DJ.videos[DJ.idx + 1] && guard++ < 24) {
+    if (!DJ.pool.length) { await djRefillPool(); if (!DJ.pool.length) break; }
+    const cand = DJ.pool.shift();
+    const recent = DJ.videos.slice(Math.max(0, DJ.idx - 7));
+    if (!recent.some(v => v.id === cand.id)) { DJ.videos.push(cand); break; }
+    DJ.pool.push(cand);                  // rotate to the back — keeps the wall endless
+  }
 }
 async function djRefillPool() {
-  if (DJ.done || !djCanShuffle() || DJ.loading) return;
+  if (!djCanShuffle() || DJ.loading) return;
   DJ.loading = true;
-  const vids = await djFetch(DJ.source, DJ.offset);
+  let vids = await djFetch(DJ.source, DJ.offset);
+  if (!vids.length && DJ.offset > 0) { DJ.offset = 0; vids = await djFetch(DJ.source, 0); }  // wrap → truly endless
   DJ.loading = false;
   if (!vids.length) { DJ.done = true; return; }
   DJ.offset += vids.length;
