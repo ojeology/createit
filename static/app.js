@@ -154,6 +154,7 @@ const ICONS = {
   volume2: "M11 5 6 9H2v6h4l5 4z|M15.5 8.5a5 5 0 0 1 0 7|M19 5a9.5 9.5 0 0 1 0 14",
   volumeX: "M11 5 6 9H2v6h4l5 4z|m22 9-6 6|m16 9l6 6",
   send: "m22 2-7 20-4-9-9-4z|M22 2 11 13",
+  gear: "M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z|M12 1.5v2.6|M12 19.9v2.6|M4.6 4.6l1.9 1.9|M17.5 17.5l1.9 1.9|M1.5 12h2.6|M19.9 12h2.6|M4.6 19.4l1.9-1.9|M17.5 6.5l1.9-1.9",
   share: "M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8|m16 6-4-4-4 4|M12 2v13",
   eye: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z|C12 12 3 0 0 0 1",
   spark: "M12 2v4|M12 18v4|M4.9 4.9l2.9 2.9|M16.2 16.2l2.9 2.9|M2 12h4|M18 12h4|M4.9 19.1l2.9-2.9|M16.2 7.8l2.9-2.9",
@@ -172,16 +173,23 @@ function ic(name, size = 16, cls = "") {
   return `<svg class="ic ${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${fill}>${body}</svg>`;
 }
 
-// ---------------- theme ----------------
+// ---------------- theme: dark / light / system ----------------
+function themePref() { try { return localStorage.getItem("ci-theme") || "system"; } catch (e) { return "system"; } }
+function resolveTheme(pref) {
+  if (pref === "system") return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return pref;
+}
 function applyTheme(t) {
   if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
   else document.documentElement.removeAttribute("data-theme");
-  try { localStorage.setItem("ci-theme", t || "light"); } catch (e) {}
 }
-function toggleTheme() {
-  const cur = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
-  applyTheme(cur === "dark" ? "light" : "dark");
+function applyThemePref(pref) {
+  applyTheme(resolveTheme(pref));
+  try { localStorage.setItem("ci-theme", pref); } catch (e) {}
 }
+matchMedia("(prefers-color-scheme: dark)").addEventListener && matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (themePref() === "system") applyThemePref("system");
+});
 
 // ---------------- splash ----------------
 (function splash() {
@@ -231,14 +239,12 @@ function renderChrome() {
   const unread = ME?.unread || 0;
   const bell = ME ? `<button class="icon-btn" data-nav="/notifications" title="Notifications">${ic("bell", 18)}${unread ? `<span class="dot-badge">${unread}</span>` : ""}</button>` : "";
   const userBtn = ME
-    ? `<button class="icon-btn" data-nav="/user/${ME.username}" title="Profile" style="width:auto;padding:0 6px;gap:6px;display:flex;align-items:center">${avatar(ME)}</button>
-       <button class="icon-btn" id="btn-logout" title="Log out">${ic("logout", 17)}</button>`
+    ? `<button class="icon-btn" data-nav="/user/${ME.username}" title="Profile" style="width:auto;padding:0 6px;gap:6px;display:flex;align-items:center">${avatar(ME)}</button>`
     : `<button class="btn btn-fire btn-sm" data-nav="/login" style="border-radius:11px">LOG IN</button>`;
   $("#topbar").innerHTML = `
     <a data-nav="/" href="#/" aria-label="CreateIt home">${brandHTML(24)}</a>
     <span class="tagline">Create It · Recreate It · Beat It</span>
-    <span class="tb-spacer"></span>
-    <button class="icon-btn theme-btn" id="btn-theme" title="Switch theme">◐</button>${bell}${userBtn}`;
+    <span class="tb-spacer"></span>${bell}${userBtn}`;
 
   const items = [
     { ico: "home", label: "HOME", path: "/" },
@@ -269,17 +275,11 @@ function renderChrome() {
     <button class="rail-item ${route.startsWith("/leaderboard") ? "active" : ""}" data-nav="/leaderboard"><span class="ico">${ic("trophy", 18)}</span>Ranks</button>
     <button class="rail-item ${route.startsWith("/notifications") ? "active" : ""}" data-nav="/notifications"><span class="ico">${ic("bell", 18)}</span>Notifications${unread ? ` <span class="dot-badge" style="position:static;margin-left:4px">${unread}</span>` : ""}</button>
     ${ME?.is_admin ? `<button class="rail-item ${route.startsWith("/admin") ? "active" : ""}" data-nav="/admin"><span class="ico">${ic("shield", 18)}</span>Admin</button>` : ""}
-    <button class="rail-item" id="btn-theme-rail"><span class="ico">◐</span>Theme</button>
     ${railUser}`;
 }
 
 document.addEventListener("click", e => {
   if (!e.target.closest(".rate")) $$(".rate.open").forEach(r => r.classList.remove("open"));
-  if (e.target.closest("#btn-theme, #btn-theme-rail")) { toggleTheme(); return; }
-  if (e.target.id === "btn-logout") {
-    api("/api/logout", { method: "POST" }).then(() => { ME = null; toast("Logged out. Come back with something unique."); route(); });
-    return;
-  }
   // data-act (play video, like…) always wins over an ancestor data-nav
   if (e.target.closest("[data-act]")) return;
   const navEl = e.target.closest("[data-nav]");
@@ -642,35 +642,50 @@ async function viewHome() {
     <div class="feed-strip">${d.hero_feed.map(feedCard).join("")}</div>
   </div>` : ""}` : `<div class="empty">${ic("film", 22)}<br>The Arena is waiting for its first challenge.</div>`}
 
-  ${d.sponsored.length ? `
-  ${secHead("02", "star", "SPONSORED CHALLENGES", "partners fuel the prizes")}
-  <div class="hscroll">${d.sponsored.map(c => challengeCard(c, true)).join("")}</div>` : ""}
-
-  ${d.beat.length ? `
-  ${secHead("03", "zap", "BEAT IT", "the final stage — one shot to surpass the original")}
-  <div style="display:grid;gap:14px">${d.beat.map(beatBoard).join("")}</div>` : ""}
-
-  ${secHead("04", "flame", "LIVE IN THE ARENA", "swipe through the active fights", ["Enter the Arena", "#/challenges"])}
-  ${d.live.length ? deckOf(d.live, c => `<div class="deck-card">${challengeCard(c)}</div>`) : `<div class="empty">The Arena is waiting for its first challenge.</div>`}
-
-  ${secHead("05", "film", "THE STAGE", "pick a lane — the latest from each side of the arena")}
-  <div class="stage-tabs">
-    <button class="st-tab active" data-act="stage-tab" data-feed="feed_create" data-empty="What can you do that nobody else can? Upload it.">
-      <span class="st-num">STAGE 1</span><span class="st-name">CREATE IT</span><span class="st-sub">the originals — tomorrow's benchmarks</span></button>
-    <button class="st-tab" data-act="stage-tab" data-feed="feed_recreate" data-empty="No verified recreations yet — only 100% scores appear here.">
-      <span class="st-num">STAGE 2</span><span class="st-name">RECREATE IT</span><span class="st-sub">verified 100% recreations only</span></button>
-    <button class="st-tab" data-act="stage-tab" data-feed="feed_beatit" data-empty="No final submissions yet — qualify at 100% first.">
-      <span class="st-num">STAGE 3</span><span class="st-name">BEAT IT</span><span class="st-sub">one final shot to surpass the original</span></button>
+  ${secHead("02", "film", "THE ORIGINAL CHALLENGE", "this is the benchmark everyone is chasing")}
+  <div class="orig-band">
+    <div class="ob-left">
+      <span class="ob-code">${esc(h.code)}</span>
+      <span class="ob-title">${esc(h.title)}</span>
+      <span class="ob-meta">${stagePill(h.stage)} <span class="ob-by" data-nav="/user/${h.creator.username}">created by <b>@${esc(h.creator.username)}</b></span></span>
+    </div>
+    <div class="ob-right">
+      ${h.stage === "recreate_it" && h.days_left != null ? `<div class="ob-count"><b>${h.days_left}</b><span>DAYS LEFT</span></div>` : ""}
+      <div class="ob-acts">
+        ${h.stage === "recreate_it" ? `<button class="btn btn-fire" data-nav="/create?kind=recreate&challenge=${h.id}">${ic("refresh", 14)} RECREATE THIS</button>` : ""}
+        <button class="btn" data-nav="/challenge/${h.id}">OPEN CHALLENGE ${ic("arrow", 13)}</button>
+      </div>
+    </div>
   </div>
-  <div id="stage-feed-area" class="stage-area">
-    ${d.feed_create.length ? `<div class="grid3">${d.feed_create.map(v => videoCard(v)).join("")}</div>` : `<div class="empty">What can you do that nobody else can? Upload it.</div>`}
-  </div>
+
+  ${d.hero_feed.length ? `
+  ${secHead("03", "refresh", "LATEST RECREATIONS", "the community is attempting it right now")}
+  <div class="feed-strip">${d.hero_feed.map(feedCard).join("")}</div>` : ""}
+
+  ${d.hero_success.length ? `
+  ${secHead("04", "check", "VERIFIED — 100% RECREATIONS", "these people proved they can do it")}
+  <div class="feed-strip verified-strip">${d.hero_success.map(feedCard).join("")}</div>` : ""}
+
+  ${secHead("05", "crown", "CURRENT CHAMPION", "")}
+  ${h.champion ? `
+  <div class="champ-plate">
+    <span class="cp-crown">${ic("crown", 48)}</span>
+    <div style="flex:1;min-width:190px">
+      <div class="cp-label">CHAMPION · ${esc(h.code)}</div>
+      <div class="cp-name">@${esc(h.champion.user.username)}</div>
+      <p style="color:var(--ink3);font-size:13px;margin-top:4px">Beat It score <b style="color:var(--gold)">${h.champion.score}%</b> · unbeaten ${h.champion.unbeaten_days} day${h.champion.unbeaten_days === 1 ? "" : "s"}</p>
+    </div>
+    <button class="btn btn-gold" data-act="watch" data-vid="${h.champion.video_id}">${ic("play", 14)} WATCH THE WIN</button>
+  </div>` : `
+  <div class="champ-open">
+    ${ic("crown", 20)}
+    <span>${h.stage === "beat_it" || h.stage === "recreate_closed" ? "Beat It is live — the champion will be crowned soon." : "No champion yet. The crown is decided in Beat It."}</span>
+    ${h.stage === "beat_it" ? `<button class="btn btn-sm btn-fire" data-nav="/challenge/${h.id}">WATCH THE FINAL</button>` : ""}
+  </div>`}
 
   ${d.champions.length ? `
-  ${secHead("06", "disc", "UNBEATEN RECORDS", "nobody has broken these marks yet")}
-  <div class="records-grid">${d.champions.map(recordCard).join("")}</div>
-  ${secHead("07", "crown", "CHAMPIONS", "", ["Full ranks", "#/leaderboard"])}
-  <div class="hscroll">${d.champions.map(challengeCard).join("")}</div>` : ""}
+  ${secHead("06", "disc", "RECORDS & CHAMPIONS", "permanent history — records exist to be broken", ["Full ranks", "#/leaderboard"])}
+  <div class="records-grid">${d.champions.map(recordCard).join("")}</div>` : ""}
 
   <div class="quote">“Maybe I don't have millions of followers. Maybe I'm not famous.<br>But I have something that is <em>uniquely mine</em>.”</div>`;
 }
@@ -886,6 +901,14 @@ async function viewChallenge(id) {
     </div>
     <button class="btn btn-gold" data-act="watch" data-vid="${champ.video_id}">${ic("play", 14)} WATCH THE WIN</button>
   </div>` : ""}
+  ${d.history && d.history.length ? `
+  ${secHead("", "disc", "CHALLENGE HISTORY", "previous champions — records never disappear")}
+  ${d.history.map(x => `<div class="hist-row">
+    ${avatar(x.user, "sm")}
+    <div class="hr-mid"><b>@${esc(x.user.username)}</b><span class="hr-d">champion ${timeAgo(x.achieved_at)} · superseded ${timeAgo(x.superseded_at)}</span></div>
+    ${scoreBadge(x.score)}
+    ${x.video_id ? `<button class="btn btn-sm" data-act="watch" data-vid="${x.video_id}">${ic("play", 12)} WATCH</button>` : ""}
+  </div>`).join("")}` : ""}
   <div class="bench">
     <div class="b-thumb" data-act="watch" data-vid="${c.original_video.id}">${thumb(c.original_video)}</div>
     <div style="flex:1;min-width:200px">
@@ -1159,6 +1182,7 @@ async function viewProfile(username) {
     <div class="prof-id"><h1>${esc(u.display_name)}</h1><div class="un">@${esc(u.username)} ${u.is_admin ? '· <span class="pill-mini pm-gold">CREATEIT TEAM</span>' : ""}</div>
       <div style="color:var(--mut);font-size:13.5px;margin-top:4px">${esc(u.bio || "No bio yet — too busy practicing.")}</div></div>
     <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">${followBtn}
+      ${own ? `<button class="btn btn-sm" data-nav="/settings">${ic("gear", 14)} SETTINGS</button>` : ""}
       <div style="color:var(--mut);font-size:13px"><b style="color:var(--text)">${u.followers}</b> followers · <b style="color:var(--text)">${u.following}</b> following</div></div>
   </div>
   <div class="socials" style="margin:4px 0 6px">${socChips}${own ? `<button class="soc-chip" id="btn-edit-socials">${ic("plus", 12)} EDIT SOCIALS</button>` : ""}
@@ -1170,10 +1194,12 @@ async function viewProfile(username) {
     <input class="input" id="soc-ig" placeholder="Instagram URL" value="${esc(soc.instagram || "")}" style="flex:1;min-width:180px">
     <button class="btn btn-sm btn-fire" id="btn-save-socials">SAVE</button></div>` : ""}
   <div class="stat-strip">
-    <div class="stat-box gold"><div class="v">${st.champion}</div><div class="k">${ic("trophy", 12)} Champion</div></div>
-    <div class="stat-box fire"><div class="v">${st.beatit}</div><div class="k">${ic("zap", 12)} Beat It entries</div></div>
-    <div class="stat-box teal"><div class="v">${st.completed}</div><div class="k">${ic("flame", 12)} Completed</div></div>
-    <div class="stat-box violet"><div class="v">${st.attempts}</div><div class="k">${ic("target", 12)} Total attempts</div></div>
+    <div class="stat-box gold"><div class="v">${st.champion}</div><div class="k">Championships</div></div>
+    <div class="stat-box teal"><div class="v">${st.completed}</div><div class="k">Successful recreations</div></div>
+    <div class="stat-box violet"><div class="v">${st.attempts}</div><div class="k">Recreations</div></div>
+    <div class="stat-box fire"><div class="v">${st.beatit}</div><div class="k">Beat It entries</div></div>
+    <div class="stat-box"><div class="v">${st.created || 0}</div><div class="k">Challenges created</div></div>
+    <div class="stat-box gold"><div class="v">${st.best_score != null ? st.best_score + "%" : "—"}</div><div class="k">Best score</div></div>
   </div>
   <div class="prof-tabs">
     ${tabs.map(([k, l, n]) => `<button class="pf-tab ${k === "creations" ? "active" : ""}" data-ptab="${k}">${l} <span class="ct">${n}</span></button>`).join("")}
@@ -1398,6 +1424,120 @@ async function viewStory(jid) {
   </div>`;
 }
 
+// ---------------- confirm modal ----------------
+function confirmModal(title, body, okLabel, danger, cb) {
+  const root = $("#modal-root");
+  root.innerHTML = `<div class="modal-backdrop" id="cfm">
+    <div class="modal" style="max-width:390px">
+      <h2>${title}</h2>
+      <p class="m-sub" style="margin-top:6px">${body}</p>
+      <div style="display:flex;gap:9px;margin-top:16px">
+        <button class="btn btn-ghost" style="flex:1" id="cfm-cancel">CANCEL</button>
+        <button class="btn ${danger ? "btn-fire" : "btn-teal"}" style="flex:1" id="cfm-ok">${okLabel}</button>
+      </div>
+    </div>
+  </div>`;
+  $("#cfm-cancel").onclick = () => root.innerHTML = "";
+  $("#cfm").addEventListener("click", e => { if (e.target.id === "cfm") root.innerHTML = ""; });
+  $("#cfm-ok").onclick = () => { root.innerHTML = ""; cb(); };
+}
+
+// ---------------- SETTINGS ----------------
+async function viewSettings() {
+  if (!ME) return viewAuth("login", "Log in to open your settings.");
+  const cur = themePref();
+  setTimeout(() => {
+    $$(".app-opt").forEach(o => o.addEventListener("click", () => {
+      applyThemePref(o.dataset.theme);
+      $$(".app-opt").forEach(x => x.classList.toggle("active", x === o));
+      toast(`Theme set to ${o.dataset.theme.toUpperCase()}`);
+    }));
+    $("#set-save-acct")?.addEventListener("click", async () => {
+      try {
+        const d = await api("/api/me/update", { method: "POST", json: {
+          display_name: $("#set-name").value.trim(), bio: $("#set-bio").value.trim() } });
+        ME = { ...ME, ...d.me }; toast("Account saved."); renderChrome();
+      } catch (err) { toast(err.message, true); }
+    });
+    $("#set-save-pw")?.addEventListener("click", async () => {
+      try {
+        await api("/api/me/password", { method: "POST", json: { old: $("#set-pw-old").value, new: $("#set-pw-new").value } });
+        $("#set-pw-old").value = ""; $("#set-pw-new").value = "";
+        toast("Password updated.");
+      } catch (err) { toast(err.message, true); }
+    });
+    $("#set-logout")?.addEventListener("click", () => {
+      confirmModal("Log out of CreateIt?", "You can come back anytime — your journey is saved.", "LOG OUT", true, async () => {
+        try { await api("/api/logout", { method: "POST" }); } catch (e) {}
+        ME = null; invalidateCache(); toast("Logged out. Come back with something unique.");
+        location.hash = "/";
+      });
+    });
+  }, 0);
+  return `
+  <div class="page-head">
+    <span class="crumb">PROFILE / SETTINGS</span>
+    <h1 class="big-title">SETTINGS</h1>
+  </div>
+
+  ${secHead("", "gear", "ACCOUNT", "")}
+  <div class="set-card">
+    <div class="field"><label>DISPLAY NAME</label><input class="input" id="set-name" value="${esc(ME.display_name)}" maxlength="40"></div>
+    <div class="field"><label>BIO</label><textarea class="input" id="set-bio" maxlength="160" placeholder="What makes you uniquely you?">${esc(ME.bio || "")}</textarea></div>
+    <div class="field"><label>USERNAME</label><input class="input" value="@${esc(ME.username)}" disabled style="opacity:.6"></div>
+    <button class="btn btn-fire btn-sm" id="set-save-acct">SAVE ACCOUNT</button>
+  </div>
+
+  ${secHead("", "spark", "APPEARANCE", "")}
+  <div class="set-card">
+    <div class="app-opts">
+      <button class="app-opt ${cur === "light" ? "active" : ""}" data-theme="light"><span class="ao-ico">☀</span><b>LIGHT</b><span class="ao-s">Bone paper</span></button>
+      <button class="app-opt ${cur === "dark" ? "active" : ""}" data-theme="dark"><span class="ao-ico">●</span><b>DARK</b><span class="ao-s">Ink studio</span></button>
+      <button class="app-opt ${cur === "system" ? "active" : ""}" data-theme="system"><span class="ao-ico">◐</span><b>SYSTEM</b><span class="ao-s">Follow device</span></button>
+    </div>
+  </div>
+
+  ${secHead("", "bell", "NOTIFICATIONS", "")}
+  <div class="set-card">
+    <p class="set-note">CreateIt tells you about the things that matter to your journey:</p>
+    <ul class="set-list">
+      <li>Someone attempted your challenge</li>
+      <li>Your attempt was scored — including the 100% moment</li>
+      <li>You became eligible for Beat It</li>
+      <li>Someone challenged your record</li>
+      <li>CreateIt selected your creation</li>
+    </ul>
+  </div>
+
+  ${secHead("", "shield", "PRIVACY & SECURITY", "")}
+  <div class="set-card">
+    <p class="set-note">During the beta, profiles and submissions are visible inside CreateIt. Change your password below.</p>
+    <div class="field" style="margin-top:12px"><label>CURRENT PASSWORD</label><input class="input" type="password" id="set-pw-old" autocomplete="current-password"></div>
+    <div class="field"><label>NEW PASSWORD</label><input class="input" type="password" id="set-pw-new" autocomplete="new-password"></div>
+    <button class="btn btn-sm" id="set-save-pw">UPDATE PASSWORD</button>
+  </div>
+
+  ${secHead("", "globe", "LANGUAGE", "")}
+  <div class="set-card"><p class="set-note">English (beta). More languages arrive as CreateIt grows.</p></div>
+
+  ${secHead("", "user", "HELP & SUPPORT", "")}
+  <div class="set-card"><p class="set-note">Stuck? The core loop is simple: CREATE something unique → the world RECREATES it → someone BEATS it → a CHAMPION is crowned. If anything feels broken, tell the CreateIt team and it becomes part of the journey.</p></div>
+
+  ${secHead("", "film", "ABOUT CREATEIT", "")}
+  <div class="set-card">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">${logoSVG(34)}<div><b style="font-family:var(--display);font-weight:900;font-size:18px">CREATE<span style="color:var(--red)">IT</span></b><div class="set-note" style="margin:0">Create It · Recreate It · Beat It</div></div></div>
+    <p class="set-note">A platform where people create something unique, challenge the world to recreate it, and compete to beat it. Followers don't decide anything here — the challenge does.</p>
+    <p class="set-note" style="margin-top:8px;font-family:var(--mono);font-size:9.5px;letter-spacing:.18em">BETA v17 · THE ARENA JOURNAL</p>
+  </div>
+
+  <div class="set-card set-danger">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div><b>LOG OUT</b><div class="set-note" style="margin:2px 0 0">@${esc(ME.username)} · your journey stays saved</div></div>
+      <button class="btn btn-fire btn-sm" id="set-logout">${ic("logout", 14)} LOG OUT</button>
+    </div>
+  </div>`;
+}
+
 // ---------------- MY ATTEMPTS page ----------------
 async function viewAttempts() {
   if (!ME) return viewAuth("login", "Log in to see the challenges you saved to attempt.");
@@ -1462,7 +1602,7 @@ async function viewNotifications() {
   if (!ME) return viewAuth("login", "Log in to see your notifications.");
   const d = await api("/api/notifications");
   api("/api/notifications/read", { method: "POST" }).then(refreshMe).then(renderChrome);
-  const icons = { like: "heart", comment: "chat", follow: "user", score: "target", review: "upload", challenge: "trophy", stage: "zap", champion: "crown", featured: "star", welcome: "spark" };
+  const icons = { like: "heart", comment: "chat", follow: "user", score: "target", review: "upload", challenge: "trophy", stage: "zap", champion: "crown", featured: "star", welcome: "spark", attempt: "target", beatit: "zap", record: "disc" };
   return `
   <div class="page-head"><span class="crumb">INBOX</span><h1 class="big-title">NOTIFICATIONS</h1></div>
   ${d.notifications.length ? d.notifications.map(n => `
@@ -1821,6 +1961,8 @@ async function route() {
     const parts = path.split("/").filter(Boolean);
     if (parts.length === 1 && parts[0] === "attempts") {
       html = await viewAttempts();
+    } else if (parts.length === 1 && parts[0] === "settings") {
+      html = await viewSettings();
     } else if (parts.length === 2 && parts[0] === "arena" && parts[1] === "recreate") {
       html = await viewArenaRecreate();
     } else if (parts.length === 2 && parts[0] === "arena" && parts[1] === "beatit") {

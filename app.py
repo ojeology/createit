@@ -117,6 +117,9 @@ CREATE TABLE IF NOT EXISTS categories(id INTEGER PRIMARY KEY, name TEXT NOT NULL
 CREATE TABLE IF NOT EXISTS video_categories(video_id INTEGER, category_id INTEGER, UNIQUE(video_id, category_id));
 CREATE TABLE IF NOT EXISTS challenge_categories(challenge_id INTEGER, category_id INTEGER, UNIQUE(challenge_id, category_id));
 CREATE TABLE IF NOT EXISTS journeys(id INTEGER PRIMARY KEY, challenge_id INTEGER UNIQUE, title TEXT, tagline TEXT, created_at TEXT);
+CREATE TABLE IF NOT EXISTS champions_history(id INTEGER PRIMARY KEY, challenge_id INTEGER, user_id INTEGER,
+  video_id INTEGER, score REAL, achieved_at TEXT, superseded_at TEXT);
+CREATE INDEX IF NOT EXISTS idx_ch_hist ON champions_history(challenge_id);
 CREATE INDEX IF NOT EXISTS idx_vc_cat ON video_categories(category_id);
 CREATE INDEX IF NOT EXISTS idx_cc_cat ON challenge_categories(category_id);
 """
@@ -515,11 +518,12 @@ def home():
     trending = videos_pub(qa("SELECT * FROM videos WHERE kind='recreate' AND score IS NOT NULL AND status='approved' ORDER BY score DESC, id DESC LIMIT 8"), me)
     discover = videos_pub(qa("SELECT * FROM videos WHERE kind='creation' AND status='approved' AND id NOT IN (SELECT COALESCE(original_video_id,0) FROM challenges) ORDER BY id DESC LIMIT 8"), me)
     hero_feed = videos_pub(qa("SELECT * FROM videos WHERE challenge_id=? AND kind='recreate' AND status='approved' ORDER BY (score IS NULL), id DESC LIMIT 12", (feat["id"],)), me) if feat else []
+    hero_success = videos_pub(qa("SELECT * FROM videos WHERE challenge_id=? AND kind='recreate' AND status='approved' AND score>=100 ORDER BY id DESC LIMIT 10", (feat["id"],)), me) if feat else []
     feed_create = videos_pub(qa("SELECT * FROM videos WHERE kind='creation' AND status='approved' ORDER BY id DESC LIMIT 10"), me)
     feed_recreate = videos_pub(qa("SELECT * FROM videos WHERE kind='recreate' AND status='approved' AND score>=100 ORDER BY id DESC LIMIT 10"), me)
     feed_beatit = videos_pub(qa("SELECT * FROM videos WHERE kind='beatit' AND status='approved' ORDER BY id DESC LIMIT 10"), me)
     return jsonify(hero=hero, live=live, beat=beat, trending=trending, discover=discover, champions=champs,
-                   hero_feed=hero_feed, feed_create=feed_create, feed_recreate=feed_recreate,
+                   hero_feed=hero_feed, hero_success=hero_success, feed_create=feed_create, feed_recreate=feed_recreate,
                    feed_beatit=feed_beatit, sponsored=sponsored)
 
 @app.get("/api/challenges")
@@ -545,7 +549,10 @@ def challenge_detail(cid):
         "SELECT * FROM videos WHERE challenge_id=? AND kind='recreate' AND status='approved' ORDER BY COALESCE(score,-1) DESC, id DESC LIMIT 12", (cid,)), me)
     beatits = videos_pub(qa(
         "SELECT * FROM videos WHERE challenge_id=? AND kind='beatit' ORDER BY COALESCE(score,-1) DESC", (cid,)), me)
-    return jsonify(challenge=challenge_pub(r, me), leaderboard=board, attempts=attempts, beatits=beatits)
+    history = [{"user": user_pub(x["user_id"]), "score": x["score"], "video_id": x["video_id"],
+                "achieved_at": x["achieved_at"], "superseded_at": x["superseded_at"]}
+               for x in qa("SELECT * FROM champions_history WHERE challenge_id=? ORDER BY achieved_at DESC LIMIT 6", (cid,))]
+    return jsonify(challenge=challenge_pub(r, me), leaderboard=board, attempts=attempts, beatits=beatits, history=history)
 
 @app.get("/api/video/<int:vid>")
 def video_detail(vid):
@@ -633,9 +640,11 @@ def profile(username):
     records = [{"challenge": {"id": c["id"], "code": c["code"], "title": c["title"]}, "score": c["champion_score"],
                 "unbeaten_days": days_ago(c["champion_at"])} for c in qa("SELECT * FROM challenges WHERE champion_id=? ORDER BY champion_at DESC", (u["id"],))]
     created = challenges_pub(qa("SELECT * FROM challenges WHERE creator_id=? ORDER BY id DESC", (u["id"],)), me)
+    best_row = q1("SELECT MAX(score) s FROM videos WHERE user_id=? AND kind='recreate' AND score IS NOT NULL", (u["id"],))
     beatit_list = videos_pub(qa("SELECT * FROM videos WHERE user_id=? AND kind='beatit' ORDER BY id DESC", (u["id"],)), me)
     return jsonify(user=pub, stats={"champion": len(champs), "completed": completed, "attempts": attempts,
-                                     "creations": creations, "beatit": beatit},
+                                     "creations": creations, "beatit": beatit,
+                                     "created": len(created), "best_score": best_row["s"]},
                    champion_of=[{"id": c["id"], "code": c["code"], "title": c["title"], "score": c["champion_score"]} for c in champs],
                    journeys=journeys, creations=creation_list, uploads=uploads, attempts=attempts, records=records,
                    created_challenges=created, beatit_list=beatit_list)
@@ -666,6 +675,28 @@ def journey(cid, uid):
     beatit = q1("SELECT * FROM videos WHERE challenge_id=? AND user_id=? AND kind='beatit'", (cid, uid))
     return jsonify(user=user_pub(u), challenge=challenge_pub(ch, me), attempts=attempts,
                    beatit=video_pub(beatit, me) if beatit else None)
+
+@app.post("/api/me/update")
+@require_user
+def me_update(u):
+    d = request.get_json(silent=True) or {}
+    dn = (d.get("display_name") or "").strip()[:40]
+    bio = (d.get("bio") or "").strip()[:160]
+    q("UPDATE users SET display_name=?, bio=? WHERE id=?", (dn or u["display_name"], bio, u["id"]))
+    commit()
+    return jsonify(ok=True, me=user_pub(u["id"]))
+
+@app.post("/api/me/password")
+@require_user
+def me_password(u):
+    d = request.get_json(silent=True) or {}
+    if not check_pw(d.get("old") or "", u["pw"]):
+        return jsonify(error="Current password is incorrect"), 400
+    if len(d.get("new") or "") < 6:
+        return jsonify(error="New password must be at least 6 characters"), 400
+    q("UPDATE users SET pw=? WHERE id=?", (hash_pw(d["new"]), u["id"]))
+    commit()
+    return jsonify(ok=True)
 
 # ---------------------------------------------------------------- notifications
 @app.get("/api/notifications")
@@ -718,7 +749,10 @@ def upload(u):
         n = q1("SELECT COUNT(*) c FROM videos WHERE challenge_id=? AND user_id=? AND kind='recreate'", (cid, u["id"]))["c"] + 1
         q("INSERT INTO videos (user_id, kind, challenge_id, title, description, file, status, attempt_no, created_at) VALUES (?,?,?,?,?,?, 'approved', ?, ?)",
           (u["id"], "recreate", cid, title or f"Attempt #{n}", desc, fname, n, now_iso()))
-        vid = q1("SELECT last_insert_rowid() id")["id"]; commit()
+        vid = q1("SELECT last_insert_rowid() id")["id"]
+        if ch["creator_id"] != u["id"]:
+            notify(ch["creator_id"], "attempt", f"@{u['username']} attempted {ch['code']} — attempt #{n} is in.", f"/challenge/{cid}")
+        commit()
         return jsonify(ok=True, video_id=vid, message=f"Attempt #{n} submitted. CreateIt evaluators will score it.")
     if kind == "beatit":
         ch = get_challenge(cid) if cid else None
@@ -733,6 +767,8 @@ def upload(u):
         vid = q1("SELECT last_insert_rowid() id")["id"]
         if ch["stage"] == "recreate_closed":
             q("UPDATE challenges SET stage='beat_it' WHERE id=?", (cid,))
+        if ch["creator_id"] != u["id"]:
+            notify(ch["creator_id"], "beatit", f"@{u['username']} submitted a Beat It final on {ch['code']}. Your benchmark is under attack.", f"/challenge/{cid}")
         commit()
         return jsonify(ok=True, video_id=vid, message="Final submission locked in. One shot. Make it count.")
     # creation / self-nomination — goes live in Discover immediately; scouts review it for challenge selection
@@ -1032,6 +1068,13 @@ def admin_crown(u):
     if not ch or not r or r["kind"] != "beatit" or r["challenge_id"] != ch["id"]:
         return jsonify(error="Invalid beat-it submission"), 400
     if r["score"] is None: return jsonify(error="Score this submission first"), 400
+    prev = q1("SELECT champion_id, champion_video_id, champion_score, champion_at FROM challenges WHERE id=?", (ch["id"],))
+    if prev and prev["champion_id"]:
+        q("INSERT INTO champions_history (challenge_id, user_id, video_id, score, achieved_at, superseded_at) VALUES (?,?,?,?,?,?)",
+          (ch["id"], prev["champion_id"], prev["champion_video_id"], prev["champion_score"], prev["champion_at"], now_iso()))
+        if prev["champion_id"] != r["user_id"]:
+            new_name = q1("SELECT username FROM users WHERE id=?", (r["user_id"],))["username"]
+            notify(prev["champion_id"], "record", f"Your record on {ch['code']} was beaten — @{new_name} is the new champion ({r['score']:g}%).", f"/challenge/{ch['id']}")
     q("UPDATE challenges SET stage='champion', champion_id=?, champion_video_id=?, champion_score=?, champion_at=? WHERE id=?",
       (r["user_id"], r["id"], r["score"], now_iso(), ch["id"]))
     notify(r["user_id"], "champion", f"You are the CHAMPION of {ch['code']} — {ch['title']}, with a final score of {r['score']:g}%!", f"/challenge/{ch['id']}")

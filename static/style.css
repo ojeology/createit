@@ -2063,3 +2063,47 @@ body::before,body::after{display:none}
 
 /* ---------- misc ---------- */
 .load-more{display:flex;justify-content:center;margin:16px 0 4px}
+
+/* ============================================================
+   v17 — SETTINGS, EVENT HOME, CHAMPION HISTORY
+   ============================================================ */
+/* settings */
+.set-card{background:var(--paper3);border:1px solid var(--line);border-radius:4px;padding:18px;margin-bottom:12px}
+.set-note{font-size:13px;color:var(--ink3);line-height:1.55}
+.set-list{margin:10px 0 0 18px;color:var(--ink2);font-size:13px;line-height:1.9}
+.set-danger{border-color:rgba(217,51,31,.5);background:rgba(217,51,31,.04)}
+.app-opts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:520px){.app-opts{grid-template-columns:1fr}}
+.app-opt{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:14px 16px;border:1px solid var(--line2);
+  border-radius:4px;background:var(--paper2);cursor:pointer;transition:.15s;text-align:left}
+.app-opt:hover{border-color:var(--ink)}
+.app-opt.active{border-color:var(--red);box-shadow:4px 4px 0 rgba(217,51,31,.15)}
+.app-opt .ao-ico{font-size:18px;color:var(--red)}
+.app-opt b{font-family:var(--mono);font-size:11px;letter-spacing:.2em}
+.app-opt .ao-s{font-size:11px;color:var(--dim)}
+
+/* home event bands */
+.orig-band{display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap;
+  border:1px solid var(--ink);border-radius:4px;background:var(--paper3);padding:18px 20px;box-shadow:6px 7px 0 rgba(23,20,14,.09)}
+.ob-left{display:flex;flex-direction:column;gap:7px;min-width:0;flex:1}
+.ob-code{font-family:var(--mono);font-size:9.5px;letter-spacing:.26em;color:var(--red)}
+.ob-title{font-family:var(--display);font-weight:900;font-size:clamp(22px,4.4vw,32px);line-height:1.08;letter-spacing:.01em}
+.ob-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px;color:var(--ink3)}
+.ob-by{cursor:pointer}.ob-by b{color:var(--ink)}
+.ob-right{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.ob-count{display:flex;flex-direction:column;align-items:center;padding:10px 18px;border:1px solid var(--line2);border-radius:4px;background:var(--paper2)}
+.ob-count b{font-family:var(--display);font-weight:900;font-size:30px;color:var(--red);line-height:1}
+.ob-count span{font-family:var(--mono);font-size:8px;letter-spacing:.24em;color:var(--dim);margin-top:3px}
+.ob-acts{display:flex;gap:9px;flex-wrap:wrap}
+.verified-strip .fc-thumb{border-color:rgba(165,124,44,.55)}
+.champ-open{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px dashed rgba(23,20,14,.4);border-radius:4px;
+  padding:18px;color:var(--ink2);font-size:13.5px}
+.champ-open .ic{color:var(--gold);flex:none}
+.champ-open span{flex:1;min-width:180px}
+
+/* champion history */
+.hist-row{display:flex;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--line);border-radius:3px;
+  background:var(--paper3);margin-bottom:8px}
+.hr-mid{flex:1;min-width:0;display:flex;flex-direction:column}
+.hr-mid b{font-size:13.5px}
+.hr-mid .hr-d{font-family:var(--mono);font-size:9.5px;color:var(--dim);letter-spacing:.06em}
