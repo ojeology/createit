@@ -676,15 +676,15 @@ async function viewChallenges(query) {
   const rec = n => `<span class="sec-n">${n}</span>`;
   const totalFighters = all.reduce((a, c) => a + c.participants, 0);
   const emblem = `<svg viewBox="0 0 120 120" fill="none" aria-hidden="true">
-    <defs><linearGradient id="aeg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#E14E2A"/><stop offset="1" stop-color="#D8A648"/></linearGradient></defs>
-    <circle class="ae-pulse" cx="60" cy="60" r="46" stroke="#E14E2A" stroke-width="1.5"/>
+    <defs><linearGradient id="aeg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#17140E"/><stop offset="1" stop-color="#17140E"/></linearGradient></defs>
+    <circle class="ae-pulse" cx="60" cy="60" r="46" stroke="#D9331F" stroke-width="1.5"/>
     <circle class="ae2-ring" cx="60" cy="60" r="46" stroke="url(#aeg)" stroke-width="2.5" stroke-linecap="round" transform="rotate(-90 60 60)"/>
     <g class="ae2-clash" stroke="url(#aeg)" stroke-width="4" stroke-linecap="round">
       <path d="M38 82 82 38"/><path d="M38 38 82 82"/>
     </g>
     <g class="ae2-target">
-      <circle cx="60" cy="60" r="17" stroke="#D8A648" stroke-width="2.5"/>
-      <circle cx="60" cy="60" r="5.5" fill="#D8A648"/>
+      <circle cx="60" cy="60" r="17" stroke="#D9331F" stroke-width="2.5"/>
+      <circle cx="60" cy="60" r="5.5" fill="#D9331F"/>
     </g>
   </svg>`;
   return `
