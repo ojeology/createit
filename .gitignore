@@ -24,9 +24,9 @@ mobile/android/app/build/
 mobile/android/local.properties
 .buildtools/
 .android/
-createit-debug.apk
+/createit-debug.apk
 .android/
-createit-debug.apk
+/createit-debug.apk
 .github/
 mobile/android/local.properties
 mobile/android/gradle.properties

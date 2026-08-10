@@ -5,7 +5,7 @@ V1 backend: Flask + SQLite. Human-judged scoring, challenge lifecycle, admin das
 """
 import os, re, uuid, sqlite3, hashlib, secrets, datetime, math
 from functools import wraps
-from flask import Flask, g, request, jsonify, send_from_directory
+from flask import Flask, g, request, jsonify, send_from_directory, send_file
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE, "createit.db")
@@ -1146,6 +1146,14 @@ def uploads_file(fn):
     else:
         resp.headers["Cache-Control"] = "public, max-age=86400"
     return resp
+
+@app.get("/download/app")
+def download_app():
+    apk = os.path.join(BASE, "mobile", "dist", "createit-debug.apk")
+    if not os.path.exists(apk):
+        return jsonify(error="The CreateIt APK has not been built yet."), 404
+    return send_file(apk, as_attachment=True, download_name="createit-debug.apk",
+                     mimetype="application/vnd.android.package-archive")
 
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
