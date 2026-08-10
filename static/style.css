@@ -2440,3 +2440,76 @@ button,a{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .djb-sec{font-family:var(--mono);font-size:9.5px;letter-spacing:.28em;color:var(--dim);margin:22px 0 10px}
 #djb-feed .grid3{gap:11px}
 .djr-browse .jrn-card{width:280px}
+
+/* ============================================================
+   v22 — PREMIUM POLISH: feedback, depth, rhythm
+   ============================================================ */
+/* universal tap feedback */
+.v-card,.ch-card,.arena-card,.records-card,.att-row,.jrn-card,.srch-ch-row,.srch-creator,.cat-chip{transition:transform .16s ease, box-shadow .22s ease, border-color .2s ease}
+.v-card:active,.ch-card:active,.arena-card:active,.records-card:active,.att-row:active,.jrn-card:active,.srch-ch-row:active,.srch-creator:active,.cat-chip:active{transform:scale(.977)}
+.bn-item:active .ico{transform:scale(.85)}
+.icon-btn:active{transform:scale(.9)}
+.sheet-opt:active{background:rgba(125,130,140,.13)}
+
+/* section rhythm: accent tick */
+.sec h2{position:relative;padding-left:14px}
+.sec h2::before{content:"";position:absolute;left:0;top:.18em;bottom:.12em;width:4px;border-radius:3px;background:var(--grad-fire)}
+.sec h2 .ic{color:var(--ink2)}
+
+/* deeper, softer cards */
+.ch-card,.arena-card,.v-card{box-shadow:0 8px 28px rgba(0,0,0,.22)}
+[data-theme="dark"] .ch-card,[data-theme="dark"] .arena-card,[data-theme="dark"] .v-card{box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.ch-card:hover,.arena-card:hover,.v-card:hover{box-shadow:0 18px 44px rgba(0,0,0,.34)}
+.ch-thumb,.ar-thumb{aspect-ratio:16/10.4}
+
+/* video card meta refinement */
+.v-foot .stats{font-family:var(--mono);font-size:10px;letter-spacing:.04em;gap:10px}
+.play-tag{font-family:var(--mono);letter-spacing:.08em;font-size:9.5px;border-radius:6px}
+
+/* hero refinements */
+.hero-grad{background:linear-gradient(to top,rgba(6,7,10,.94) 2%,rgba(6,7,10,.4) 34%,transparent 58%),linear-gradient(to bottom,rgba(6,7,10,.5),transparent 24%)}
+.hero-flag{box-shadow:0 4px 18px rgba(0,0,0,.35)}
+.hi-livechip{box-shadow:0 4px 14px rgba(0,0,0,.3)}
+
+/* arena stage panels: depth + texture */
+.sp-rec{background:radial-gradient(120% 140% at 12% 0%,rgba(255,255,255,.14),transparent 42%),linear-gradient(140deg,#c73a20,#8f2413)}
+.sp-beat{background:radial-gradient(120% 140% at 12% 0%,rgba(255,255,255,.07),transparent 42%),linear-gradient(140deg,#1c1f27,#12141a)}
+.stage-panel:active{transform:scale(.985)}
+.sp-desc{opacity:.82;line-height:1.5}
+
+/* stat numbers pop */
+.stat-box .v{letter-spacing:.02em}
+.hs b{letter-spacing:.02em}
+
+/* toasts */
+.toast{font-size:13px;letter-spacing:.02em;box-shadow:0 14px 40px rgba(0,0,0,.5)}
+
+/* skeleton shimmer richer */
+.skel::after{background:linear-gradient(100deg,transparent 25%,rgba(255,255,255,.09) 50%,transparent 75%);animation-duration:1.15s}
+
+/* inputs polish */
+.input{transition:border-color .18s ease, box-shadow .18s ease}
+.disc-searchbig{box-shadow:0 6px 22px rgba(0,0,0,.16)}
+
+/* profile header polish */
+.prof-head{padding:4px 2px 14px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.avatar.lg{box-shadow:0 10px 30px rgba(0,0,0,.28)}
+.stat-strip{padding-top:16px}
+
+/* challenge page flow */
+.fight-card,.bench{box-shadow:0 12px 34px rgba(0,0,0,.2)}
+.status-banner{box-shadow:0 4px 16px rgba(0,0,0,.12)}
+.sb-l{letter-spacing:.22em;font-size:11.5px}
+
+/* journey dots richer */
+.j-dot .bar{box-shadow:0 2px 8px rgba(0,0,0,.18)}
+
+/* comments rows */
+.c-row .c-body{line-height:1.5}
+
+/* feed strip polish */
+.feed-card .fc-thumb{box-shadow:0 8px 22px rgba(0,0,0,.22)}
+.feed-card:active{transform:scale(.97)}
+
+/* discovery: video card inside browse keeps dark-friendly shadow */
+.djr-browse .v-card{box-shadow:0 6px 18px rgba(0,0,0,.18)}

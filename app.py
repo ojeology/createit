@@ -56,7 +56,7 @@ def check_pw(pw, stored):
     return hashlib.sha256((salt + pw).encode()).hexdigest() == h
 
 def current_user():
-    tok = request.cookies.get("ci_token")
+    tok = request.headers.get("X-CI-Token") or request.cookies.get("ci_token")
     if not tok: return None
     return q1("SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=?", (tok,))
 
@@ -473,9 +473,10 @@ def register():
     uid = q1("SELECT id FROM users WHERE username=?", (un,))["id"]
     tok = secrets.token_hex(24)
     q("INSERT INTO sessions VALUES (?,?,?)", (tok, uid, now_iso()))
+    _reg_tok = tok
     notify(uid, "welcome", "Welcome to CreateIt. Upload something uniquely yours — followers don't matter here.", "/create")
     commit()
-    resp = jsonify(me=user_pub(uid)); resp.set_cookie("ci_token", tok, httponly=True, samesite="Lax", max_age=86400*30)
+    resp = jsonify(me=user_pub(uid), token=_reg_tok); resp.set_cookie("ci_token", tok, httponly=True, samesite="Lax", max_age=86400*30)
     return resp
 
 @app.post("/api/login")
@@ -486,12 +487,12 @@ def login():
         return jsonify(error="Invalid username or password"), 401
     tok = secrets.token_hex(24)
     q("INSERT INTO sessions VALUES (?,?,?)", (tok, u["id"], now_iso())); commit()
-    resp = jsonify(me=user_pub(u)); resp.set_cookie("ci_token", tok, httponly=True, samesite="Lax", max_age=86400*30)
+    resp = jsonify(me=user_pub(u), token=tok); resp.set_cookie("ci_token", tok, httponly=True, samesite="Lax", max_age=86400*30)
     return resp
 
 @app.post("/api/logout")
 def logout():
-    tok = request.cookies.get("ci_token")
+    tok = request.headers.get("X-CI-Token") or request.cookies.get("ci_token")
     if tok: q("DELETE FROM sessions WHERE token=?", (tok,)); commit()
     resp = jsonify(ok=True); resp.delete_cookie("ci_token"); return resp
 

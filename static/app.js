@@ -11,9 +11,11 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 const _apiCache = new Map();
 const CACHE_TTL = 20000;
 function invalidateCache() { _apiCache.clear(); }
+function authToken() { try { return localStorage.getItem("ci_token") || ""; } catch (e) { return ""; } }
 async function api(path, opts = {}) {
   const o = { headers: {}, ...opts };
   const isGet = !o.method || o.method === "GET";
+  const _t = authToken(); if (_t) o.headers["X-CI-Token"] = _t;
   if (o.json !== undefined) { o.headers["Content-Type"] = "application/json"; o.body = JSON.stringify(o.json); delete o.json; }
   if (!isGet) {
     const r = await fetch(path, o);
@@ -1540,6 +1542,7 @@ async function viewSettings() {
     $("#set-logout")?.addEventListener("click", () => {
       confirmModal("Log out of CreateIt?", "You can come back anytime — your journey is saved.", "LOG OUT", true, async () => {
         try { await api("/api/logout", { method: "POST" }); } catch (e) {}
+        try { localStorage.removeItem("ci_token"); } catch (e) {}
         ME = null; invalidateCache(); toast("Logged out. Come back with something unique.");
         location.hash = "/";
       });
@@ -1699,7 +1702,8 @@ function viewAuth(mode, note) {
         if (m === "register") body.display_name = $("#auth-name").value.trim();
         try {
           const d = await api(m === "login" ? "/api/login" : "/api/register", { method: "POST", json: body });
-          ME = d.me; toast(m === "login" ? `Welcome back, @${ME.username}.` : `Welcome to CreateIt, @${ME.username}. Bring something unique.`);
+          if (d.token) { try { localStorage.setItem("ci_token", d.token); } catch (e) {} }
+          ME = d.me; invalidateCache(); toast(m === "login" ? `Welcome back, @${ME.username}.` : `Welcome to CreateIt, @${ME.username}. Bring something unique.`);
           location.hash = "/";
         } catch (err) { toast(err.message, true); }
       };
