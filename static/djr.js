@@ -1,15 +1,15 @@
 /* ============================================================
-   DISCOVERY JOURNEY — horizontal immersive video universe
-   Swipe through people's abilities. One video is the screen.
+   DISCOVERY JOURNEY — finger-tracking horizontal video pager
+   Forward: unpredictable (shuffled). Backward: exact history.
    ============================================================ */
 const DJ = {
   videos: [], idx: 0, muted: false, positions: new Map(),
   source: null, curKey: "", loading: false, done: false, active: false,
-  batch: 12, raf: 0, pool: [], offset: 0, loadingAdv: false, viewer: false,
+  batch: 12, pool: [], offset: 0, viewer: false, rateVal: 3,
 };
+const DG = { down:false, sx:0, sy:0, dx:0, t0:0, axis:null, animating:false };
 function djShuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 function djCanShuffle() { return DJ.source && (DJ.source.type === "trending" || DJ.source.type === "new"); }
-
 function djSourceKey(src) {
   if (src.type === "list") return "list:" + (src.videos && src.videos[0] ? src.videos[0].id : 0) + ":" + (src.videos ? src.videos.length : 0);
   return src.type + ":" + (src.q || src.slug || src.id || "");
@@ -19,7 +19,13 @@ function djSourceKey(src) {
 function djShell() {
   return `
   <div class="djr" id="djr">
-    <div class="djr-track" id="djr-track"></div>
+    <div class="djr-track" id="djr-track">
+      <div class="djr-window" id="djr-window">
+        <div class="djr-slot" data-slot="0"></div>
+        <div class="djr-slot" data-slot="1"></div>
+        <div class="djr-slot" data-slot="2"></div>
+      </div>
+    </div>
     <div class="djr-load" id="djr-load" style="display:none">${logoSVG(36)}</div>
     <div class="djr-top">
       <button class="djr-ico djr-back" data-act="dj-exit" aria-label="Back">${ic("arrow", 16)}</button>
@@ -29,11 +35,10 @@ function djShell() {
         <button class="djr-ico" data-act="dj-sound" id="djr-sound" aria-label="Sound">${ic("volumeX", 19)}</button>
       </div>
     </div>
-    <div class="djr-count" id="djr-count"></div>
     <div class="djr-bottom">
       <div class="djr-info" id="djr-info"></div>
       <div class="djr-bar">
-        <button class="djr-act" data-act="dj-rate">${ic("zap", 20)}<span>RATE</span><em id="djr-rate-n"></em></button>
+        <button class="djr-act" data-act="dj-rate">${ic("zap", 20)}<span>RATE</span><em id="djr-rate-avg"></em></button>
         <button class="djr-act" data-act="dj-comment">${ic("chat", 20)}<span>COMMENT</span><em id="djr-c-n"></em></button>
         <button class="djr-act" data-act="dj-share">${ic("share", 19)}<span>SHARE</span></button>
         <button class="djr-act djr-go" data-act="dj-attempt" id="djr-attempt">${ic("target", 20)}<span id="djr-attempt-lbl">ATTEMPT</span></button>
@@ -42,11 +47,12 @@ function djShell() {
     <div class="djr-progress"><div id="djr-pbar"></div></div>
 
     <div class="djr-ratepop" id="djr-ratepop" style="display:none">
-      <div class="drp-card">
-        <div class="drp-h">HOW IMPRESSIVE?</div>
-        <div class="drp-gauge" id="drp-gauge">
-          ${[5,4,3,2,1].map(n => `<div class="drp-c" data-n="${n}"><b>${n}</b><span>${["","LOW","GOOD","IMPRESSIVE","INSANE","EXCEPTIONAL"][n]}</span></div>`).join("")}
-        </div>
+      <div class="drp-card" id="drp-card">
+        <div class="drp-h">HOW IMPRESSIVE IS THIS?</div>
+        <div class="drp-val"><b id="drp-num">3</b><span id="drp-word">IMPRESSIVE</span></div>
+        <div class="drp-bars" id="drp-bars"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="drp-hint">SWIPE UP / DOWN · THEN SUBMIT</div>
+        <button class="btn btn-fire btn-block" id="drp-save">SUBMIT RATING</button>
         <div class="drp-avg" id="drp-avg"></div>
       </div>
     </div>
@@ -77,42 +83,222 @@ async function djBoot() {
   DJ.active = true;
   try { DJ.muted = sessionStorage.getItem("dj-muted") === "1"; } catch (e) {}
   djApplySoundBtn();
-  const track = document.getElementById("djr-track");
-  track.addEventListener("scroll", djOnScroll, { passive: true });
-  djArmGestures(track);
+  djArmPager();
   if (!DJ.videos.length) await djEnter({ type: "trending", label: "TRENDING" }, 0);
-  else { djBuildTrack(); djScrollTo(DJ.idx, false); djActivate(DJ.idx); }
-}
-
-function djArmGestures(track) {
-  if (!track || track.dataset.gestured) return;
-  track.dataset.gestured = "1";
-  let sx = 0, sy = 0;
-  track.addEventListener("pointerdown", e => { sx = e.clientX; sy = e.clientY; }, { passive: true });
-  track.addEventListener("pointerup", e => {
-    if (Math.abs(e.clientX - sx) > 12 || Math.abs(e.clientY - sy) > 12) return; // it was a swipe
-    const slide = e.target.closest(".djr-slide");
-    if (!slide || +slide.dataset.i !== DJ.idx) return;
-    const vid = slide.querySelector("video");
-    if (!vid) return;
-    if (vid.muted) {                                   // first gesture → sound on automatically
-      vid.muted = false; DJ.muted = false;
-      try { sessionStorage.setItem("dj-muted", "0"); } catch (err) {}
-      djApplySoundBtn();
-      vid.play().catch(() => {});
-    } else if (!vid.paused) vid.pause();
-    else vid.play().catch(() => {});
-  }, { passive: true });
+  else { djPaintWindow(); djCenter(); djActivateCurrent(); }
 }
 
 function djTeardown() {
   if (!DJ.active) return;
   DJ.active = false;
-  const track = document.getElementById("djr-track");
-  if (track) { for (const s of track.children) djStripVideo(s); }
+  const win = document.getElementById("djr-window");
+  if (win) for (const slot of win.children) djClearSlot(slot);
 }
 
-// ---------------- sources ----------------
+// ---------------- finger-tracking pager ----------------
+function djWin() { return document.getElementById("djr-window"); }
+function djTrackW() {
+  const t = document.getElementById("djr-track");
+  return t ? t.clientWidth : window.innerWidth;
+}
+function djSetX(px, animate) {
+  const win = djWin();
+  if (!win) return;
+  win.style.transition = animate ? "transform .28s cubic-bezier(.25,.9,.3,1)" : "none";
+  win.style.transform = `translateX(${px}px)`;
+}
+function djCenter() { djSetX(-djTrackW(), false); }
+
+function djArmPager() {
+  const track = document.getElementById("djr-track");
+  if (!track || track.dataset.pagered) return;
+  track.dataset.pagered = "1";
+  let tapX = 0, tapY = 0;
+  track.addEventListener("pointerdown", e => {
+    if (DG.animating) return;
+    DG.down = true; DG.sx = e.clientX; DG.sy = e.clientY; tapX = e.clientX; tapY = e.clientY;
+    DG.dx = 0; DG.t0 = performance.now(); DG.axis = null;
+    djSetX(-djTrackW(), false);
+  }, { passive: true });
+  track.addEventListener("pointermove", e => {
+    if (!DG.down || DG.animating) return;
+    const dx = e.clientX - DG.sx, dy = e.clientY - DG.sy;
+    if (DG.axis === null && (Math.abs(dx) > 7 || Math.abs(dy) > 7)) DG.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+    if (DG.axis !== "x") return;
+    DG.dx = dx;
+    djSetX(-djTrackW() + dx, false);
+  }, { passive: true });
+  const finish = () => {
+    if (!DG.down) return;
+    DG.down = false;
+    if (DG.axis === null) { djHandleTap(); djCenter(); return; }
+    if (DG.axis !== "x" || DG.animating) { djCenter(); return; }
+    const W = djTrackW();
+    const dt = Math.max(1, performance.now() - DG.t0);
+    const vel = Math.abs(DG.dx) / dt;
+    const far = Math.abs(DG.dx) > W * 0.20;
+    const flick = vel > 0.55 && Math.abs(DG.dx) > 30;
+    if (DG.dx < 0 && (far || flick)) djGo(1);
+    else if (DG.dx > 0 && (far || flick)) djGo(-1);
+    else djCenter();
+  };
+  track.addEventListener("pointerup", finish, { passive: true });
+  track.addEventListener("pointercancel", () => { if (DG.down) { DG.down = false; djCenter(); } }, { passive: true });
+}
+
+function djHandleTap() {
+  const vid = djActiveVideo();
+  if (!vid) return;
+  if (vid.muted) {
+    vid.muted = false; DJ.muted = false;
+    try { sessionStorage.setItem("dj-muted", "0"); } catch (e) {}
+    djApplySoundBtn();
+    vid.play().catch(() => {});
+  } else if (!vid.paused) vid.pause();
+  else vid.play().catch(() => {});
+}
+
+function djGo(dir) {
+  if (DG.animating) { return; }
+  if (dir === 1) {
+    if (DJ.videos[DJ.idx + 1]) { djGoAnimated(1); return; }
+    if (djCanShuffle()) {
+      djShowLoad(true);
+      djEnsureNext().then(() => {
+        djShowLoad(false);
+        if (DJ.videos[DJ.idx + 1]) djGoAnimated(1); else { djCenter(); djReplay(); }
+      });
+      return;
+    }
+    djCenter(); djReplay(); return;
+  }
+  if (DJ.idx > 0) djGoAnimated(-1); else djCenter();
+}
+function djGoAnimated(dir) {
+  if (DG.animating) { djCenter(); return; }
+  const W = djTrackW();
+  const valid = dir === 1 ? !!DJ.videos[DJ.idx + 1] : DJ.idx > 0;
+  if (!valid) { djCenter(); return; }
+  DG.animating = true;
+  djSetX(dir === 1 ? -2 * W : 0, true);
+  let done = false;
+  const after = () => {
+    if (done) return; done = true;
+    DJ.idx += dir;
+    if (dir === 1) djEnsureNext();
+    djPaintWindow();
+    djSetX(-djTrackW(), false);
+    DG.animating = false;
+    djActivateCurrent();
+  };
+  djWin().addEventListener("transitionend", after, { once: true });
+  setTimeout(after, 360);
+}
+
+// ---------------- slots ----------------
+function djSlideHTML(v) {
+  return `${v.poster ? `<img class="djr-bg" src="${v.poster}" alt="" loading="lazy">` : ""}`;
+}
+function djClearSlot(slot) {
+  if (!slot) return;
+  const vid = slot.querySelector("video");
+  if (vid) { try { vid.pause(); } catch (e) {} vid.removeAttribute("src"); vid.load(); }
+  slot.innerHTML = "";
+  delete slot.dataset.vid;
+}
+function djBuildSlot(slot, v) {
+  djClearSlot(slot);
+  if (!v) return;
+  slot.dataset.vid = String(v.id);
+  slot.innerHTML = djSlideHTML(v);
+  const el = document.createElement("video");
+  el.setAttribute("playsinline", ""); el.playsInline = true;
+  el.preload = "auto"; el.muted = DJ.muted;
+  if (v.poster) el.poster = v.poster;
+  el.addEventListener("ended", () => {
+    if (slot.dataset.slot === "1" && DJ.videos[DJ.idx] && DJ.videos[DJ.idx].id === v.id) djAutoNext();
+  });
+  el.addEventListener("timeupdate", () => { if (slot.dataset.slot === "1") { DJ.positions.set(DJ.idx, el.currentTime); djProgress(el); } });
+  el.addEventListener("waiting", () => { if (slot.dataset.slot === "1") djShowLoad(true); });
+  el.addEventListener("playing", () => { if (slot.dataset.slot === "1") djShowLoad(false); });
+  el.addEventListener("canplay", () => { if (slot.dataset.slot === "1") djShowLoad(false); });
+  el.addEventListener("error", () => { if (slot.dataset.slot === "1") djShowError(slot, DJ.idx); });
+  el.src = v.src;
+  slot.appendChild(el);
+}
+function djPaintWindow() {
+  const win = djWin();
+  if (!win) return;
+  const slots = [...win.children];
+  const vids = [DJ.videos[DJ.idx - 1], DJ.videos[DJ.idx], DJ.videos[DJ.idx + 1]];
+  slots.forEach((slot, i) => {
+    slot.dataset.slot = String(i);
+    const v = vids[i];
+    if (!v) { djClearSlot(slot); return; }
+    if (slot.dataset.vid === String(v.id)) return;
+    djBuildSlot(slot, v);
+  });
+}
+function djActiveVideo() {
+  const win = djWin();
+  const slot = win && win.children[1];
+  return slot && slot.querySelector("video");
+}
+
+// ---------------- pool (forward shuffle) ----------------
+async function djEnsureNext() {
+  if (DJ.videos[DJ.idx + 1]) return;
+  if (!djCanShuffle()) return;
+  if (!DJ.pool.length && !DJ.done && !DJ.loading) await djRefillPool();
+  if (DJ.pool.length) DJ.videos.push(DJ.pool.shift());
+}
+async function djRefillPool() {
+  if (DJ.done || !djCanShuffle() || DJ.loading) return;
+  DJ.loading = true;
+  const vids = await djFetch(DJ.source, DJ.offset);
+  DJ.loading = false;
+  if (!vids.length) { DJ.done = true; return; }
+  DJ.offset += vids.length;
+  DJ.pool = DJ.pool.concat(djShuffle(vids));
+}
+function djPreloadPoolSoon() {
+  if (djCanShuffle() && !DJ.done && DJ.pool.length < 4) djRefillPool();
+}
+
+// ---------------- active video ----------------
+function djActivateCurrent() {
+  const win = djWin();
+  if (!win) return;
+  const slots = [...win.children];
+  for (let j = 0; j < slots.length; j++) {
+    const vel = slots[j].querySelector("video");
+    if (vel && j !== 1) vel.pause();
+  }
+  const cur = djActiveVideo();
+  if (cur) {
+    const pos = DJ.positions.get(DJ.idx);
+    if (pos != null && pos > 0.5) { try { cur.currentTime = pos; } catch (e) {} }
+    cur.muted = DJ.muted;
+    const p = cur.play();
+    if (p) p.catch(() => {
+      cur.muted = true;
+      if (!DJ.muted) { djApplySoundBtn(); djSoundHint(); }
+      cur.play().catch(() => {});
+    });
+  }
+  djUpdateOverlay();
+  djEnsureNext();
+  djPreloadPoolSoon();
+}
+function djAutoNext() {
+  if (DJ.videos[DJ.idx + 1] || djCanShuffle()) djGo(1);
+  else djReplay();
+}
+function djReplay() {
+  const el = djActiveVideo();
+  if (el) { el.currentTime = 0; DJ.positions.set(DJ.idx, 0); el.play().catch(() => {}); }
+}
+
 async function djFetch(source, offset) {
   try {
     if (source.type === "trending" || source.type === "new") {
@@ -155,167 +341,31 @@ async function djEnter(source, startIdx) {
       djShuffle(vids);
       DJ.offset = vids.length;
       DJ.pool = vids.slice(1);
-      vids = vids.slice(0, 1);
+      DJ.videos = [vids[0]];
+      DJ.idx = 0;
     } else {
       DJ.offset = vids.length;
+      DJ.videos = vids;
+      DJ.idx = Math.max(0, Math.min(startIdx || 0, Math.max(0, vids.length - 1)));
       if (source.type !== "trending" && source.type !== "new") DJ.done = true;
     }
-    DJ.videos = vids;
     if (!DJ.videos.length) {
-      const track = document.getElementById("djr-track");
-      if (track) track.innerHTML = `<div class="djr-slide"><div class="djr-empty">${ic("film", 26)}<span>Nothing here yet — be the first to CREATE IT.</span></div></div>`;
+      const slot = djWin() && djWin().children[1];
+      if (slot) slot.innerHTML = `<div class="djr-empty">${ic("film", 26)}<span>Nothing here yet — be the first to CREATE IT.</span></div>`;
       return;
     }
-    djBuildTrack();
+  } else {
+    DJ.idx = Math.max(0, Math.min(startIdx || 0, DJ.videos.length - 1));
   }
-  const i = Math.max(0, Math.min(startIdx || 0, DJ.videos.length - 1));
-  djScrollTo(i, false);
-  djActivate(i);
-}
-
-// ---------------- track & windowing ----------------
-function djSlideHTML(v, i) {
-  return `<div class="djr-slide" data-i="${i}">
-    ${v.poster ? `<img class="djr-bg" src="${v.poster}" alt="" loading="lazy">` : ""}
-  </div>`;
-}
-function djBuildTrack() {
-  const track = document.getElementById("djr-track");
-  if (!track) return;
-  track.innerHTML = DJ.videos.map((v, i) => djSlideHTML(v, i)).join("");
-}
-function djPageW() {
-  const s = document.querySelector("#djr-track .djr-slide");
-  return s ? s.clientWidth : window.innerWidth;
-}
-function djScrollTo(i, smooth) {
-  const track = document.getElementById("djr-track");
-  if (!track) return;
-  track.scrollTo({ left: i * djPageW(), behavior: smooth ? "smooth" : "auto" });
-}
-function djOnScroll() {
-  if (DJ.raf) return;
-  DJ.raf = requestAnimationFrame(() => {
-    DJ.raf = 0;
-    const track = document.getElementById("djr-track");
-    if (!track) return;
-    const i = Math.round(track.scrollLeft / djPageW());
-    if (i !== DJ.idx && i >= 0 && i < DJ.videos.length) djActivate(i);
-  });
-}
-
-function djMountVideo(slide, i) {
-  if (!slide || slide.querySelector("video")) return;
-  const v = DJ.videos[i];
-  if (!v) return;
-  const el = document.createElement("video");
-  el.setAttribute("playsinline", ""); el.playsInline = true;
-  el.preload = "auto"; el.muted = DJ.muted;
-  if (v.poster) el.poster = v.poster;
-  el.addEventListener("ended", () => { if (DJ.idx === i) djAutoNext(i); });
-  el.addEventListener("timeupdate", () => { if (DJ.idx === i) { DJ.positions.set(i, el.currentTime); djProgress(el); } });
-  el.addEventListener("waiting", () => { if (DJ.idx === i) djShowLoad(true); });
-  el.addEventListener("playing", () => { if (DJ.idx === i) djShowLoad(false); });
-  el.addEventListener("canplay", () => { if (DJ.idx === i) djShowLoad(false); });
-  el.addEventListener("error", () => { if (DJ.idx === i) djShowError(slide, i); });
-  el.src = v.src;
-  slide.appendChild(el);
-}
-function djStripVideo(slide) {
-  const v = slide && slide.querySelector("video");
-  if (!v) return;
-  try { v.pause(); } catch (e) {}
-  v.removeAttribute("src"); v.load();
-  v.remove();
-}
-
-// ---------------- active video ----------------
-function djActivate(i) {
-  DJ.idx = i;
-  const track = document.getElementById("djr-track");
-  if (!track) return;
-  const slides = track.children;
-  for (let j = 0; j < slides.length; j++) {
-    if (Math.abs(j - i) <= 1) djMountVideo(slides[j], j);
-    else djStripVideo(slides[j]);
-  }
-  for (let j = 0; j < slides.length; j++) {
-    const vel = slides[j].querySelector && slides[j].querySelector("video");
-    if (vel && j !== i) vel.pause();
-  }
-  const cur = slides[i] && slides[i].querySelector("video");
-  if (cur) {
-    const pos = DJ.positions.get(i);
-    if (pos != null && pos > 0.5) { try { cur.currentTime = pos; } catch (e) {} }
-    cur.muted = DJ.muted;
-    const p = cur.play();
-    if (p) p.catch(() => {
-      cur.muted = true;               // OS blocked audible autoplay — stay quiet until first gesture
-      if (!DJ.muted) { djApplySoundBtn(); djSoundHint(); }
-      cur.play().catch(() => {});
-    });
-  }
-  djUpdateOverlay();
-  if (djCanShuffle() && i >= DJ.videos.length - 2) djPreloadPoolSoon();
-}
-
-async function djRefillPool() {
-  if (DJ.done || !djCanShuffle() || DJ.loading) return;
-  DJ.loading = true;
-  const vids = await djFetch(DJ.source, DJ.offset);
-  DJ.loading = false;
-  if (!vids.length) { DJ.done = true; return; }
-  DJ.offset += vids.length;
-  DJ.pool = DJ.pool.concat(djShuffle(vids));
-}
-function djPreloadPoolSoon() {
-  if (djCanShuffle() && !DJ.done && DJ.pool.length < 4) djRefillPool();
-}
-
-function djAutoNext(i) {
-  if (i + 1 < DJ.videos.length) { djScrollTo(i + 1, true); return; }
-  if (djCanShuffle()) { djAdvance(); return; }
-  djReplay(i);
-}
-async function djAdvance() {
-  if (DJ.loadingAdv) return;
-  DJ.loadingAdv = true;
-  if (!DJ.pool.length) await djRefillPool();
-  DJ.loadingAdv = false;
-  if (!DJ.pool.length) { djReplay(DJ.videos.length - 1); return; }
-  const next = DJ.pool.shift();
-  DJ.videos.push(next);
-  const track = document.getElementById("djr-track");
-  if (track) track.insertAdjacentHTML("beforeend", djSlideHTML(next, DJ.videos.length - 1));
-  djScrollTo(DJ.videos.length - 1, true);
-  djPreloadPoolSoon();
-}
-function djReplay(i) {
-  const track = document.getElementById("djr-track");
-  const el = track && track.children[i] && track.children[i].querySelector("video");
-  if (el) { el.currentTime = 0; DJ.positions.set(i, 0); el.play().catch(() => {}); }
-}
-
-async function djLoadMore() {
-  if (DJ.loading || DJ.done) return;
-  DJ.loading = true;
-  const vids = await djFetch(DJ.source, DJ.videos.length);
-  DJ.loading = false;
-  const track = document.getElementById("djr-track");
-  if (!track) return;
-  if (!vids.length) { DJ.done = true; return; }
-  const base = DJ.videos.length;
-  DJ.videos = DJ.videos.concat(vids);
-  track.insertAdjacentHTML("beforeend", vids.map((v, k) => djSlideHTML(v, base + k)).join(""));
-  if (DJ.idx >= DJ.videos.length - 3 && !DJ.done) djLoadMore();
+  djPaintWindow();
+  djCenter();
+  djActivateCurrent();
 }
 
 // ---------------- overlay ----------------
 function djUpdateOverlay() {
   const v = DJ.videos[DJ.idx];
   if (!v) return;
-  const cnt = document.getElementById("djr-count");
-  if (cnt) cnt.textContent = `${DJ.idx + 1} / ${DJ.videos.length}`;
   let kicker, sub;
   if (v.djChapter) { kicker = v.djChapter; sub = v.challenge ? `${v.challenge.code} · ${v.challenge.title}` : ""; }
   else if (v.kind === "creation") { kicker = "ORIGINAL CREATION"; sub = v.challenge ? `${v.challenge.code} · ${v.challenge.title}` : "POTENTIAL CREATEIT CHALLENGE"; }
@@ -329,8 +379,8 @@ function djUpdateOverlay() {
     ${sub ? `<div class="djr-sub">${esc(sub)}</div>` : ""}`;
   const cn = document.getElementById("djr-c-n");
   if (cn) cn.textContent = v.comments || 0;
-  const rn = document.getElementById("djr-rate-n");
-  if (rn) rn.textContent = v.rating && v.rating.mine ? `${v.rating.mine}/5` : "";
+  const ra = document.getElementById("djr-rate-avg");
+  if (ra) ra.textContent = v.rating && v.rating.count ? v.rating.avg : "";
   const att = document.getElementById("djr-attempt");
   if (att) {
     if (v.challenge) {
@@ -342,7 +392,6 @@ function djUpdateOverlay() {
   const pb = document.getElementById("djr-pbar");
   if (pb) pb.style.width = "0%";
 }
-
 function djProgress(el) {
   const pb = document.getElementById("djr-pbar");
   if (pb && el.duration) pb.style.width = Math.min(100, (el.currentTime / el.duration) * 100) + "%";
@@ -357,12 +406,13 @@ function djShowError(slide, i) {
   slide.insertAdjacentHTML("beforeend", `<div class="djr-err" data-act="dj-retry" data-i="${i}">COULDN'T LOAD THIS — TAP TO RETRY</div>`);
 }
 function djRetry(i) {
-  const track = document.getElementById("djr-track");
-  const slide = track && track.children[i];
-  if (!slide) return;
-  const err = slide.querySelector(".djr-err"); if (err) err.remove();
-  djStripVideo(slide); djMountVideo(slide, i);
-  const el = slide.querySelector("video"); if (el) el.play().catch(() => {});
+  const win = djWin();
+  const slot = win && win.children[1];
+  if (!slot) return;
+  const err = slot.querySelector(".djr-err"); if (err) err.remove();
+  const v = DJ.videos[DJ.idx];
+  if (v) djBuildSlot(slot, v);
+  const el = slot.querySelector("video"); if (el) el.play().catch(() => {});
 }
 
 // ---------------- sound ----------------
@@ -389,29 +439,68 @@ function djToggleSound() {
   if (!DJ.muted) toast("Sound on");
 }
 
-// ---------------- rating ----------------
+
+// ---------------- rate: vertical swipe bars ----------------
+const DJ_RATE_WORDS = ["", "LOW", "GOOD", "IMPRESSIVE", "INSANE", "EXCEPTIONAL"];
+function djPaintRate(n) {
+  DJ.rateVal = n;
+  const num = document.getElementById("drp-num");
+  const word = document.getElementById("drp-word");
+  const bars = document.getElementById("drp-bars");
+  if (num) num.textContent = n;
+  if (word) word.textContent = DJ_RATE_WORDS[n] || "";
+  if (bars) [...bars.children].forEach((b, i) => b.classList.toggle("on", i < n));
+}
+function djHaptic() { try { if (navigator.vibrate) navigator.vibrate(9); } catch (e) {} }
 function djOpenRate() {
   const v = DJ.videos[DJ.idx];
   if (!v) return;
-  const pop = document.getElementById("djr-ratepop");
-  const g = document.getElementById("drp-gauge");
-  [...g.children].forEach(c => c.classList.toggle("on", !!(v.rating && v.rating.mine) && +c.dataset.n <= v.rating.mine));
+  djPaintRate((v.rating && v.rating.mine) || 3);
   document.getElementById("drp-avg").innerHTML = v.rating && v.rating.count
-    ? `<b>${v.rating.avg}</b>/5 · ${v.rating.count} rating${v.rating.count === 1 ? "" : "s"}` : "BE THE FIRST TO RATE";
-  pop.style.display = "flex";
+    ? `COMMUNITY · <b>${v.rating.avg}</b>/5 · ${v.rating.count} rating${v.rating.count === 1 ? "" : "s"}` : "BE THE FIRST TO RATE THIS";
+  document.getElementById("djr-ratepop").style.display = "flex";
+  djArmRateGestures();
+}
+function djArmRateGestures() {
+  const card = document.getElementById("drp-card");
+  if (!card || card.dataset.rated) return;
+  card.dataset.rated = "1";
+  let sy = 0, startVal = 3, moved = false;
+  card.addEventListener("pointerdown", e => {
+    if (e.target.closest("#drp-save")) return;
+    sy = e.clientY; startVal = DJ.rateVal; moved = false;
+    const move = ev => {
+      const dy = sy - ev.clientY;                     // up = positive
+      if (Math.abs(dy) > 10) moved = true;
+      const steps = Math.round(dy / 44);
+      const n = Math.max(1, Math.min(5, startVal + steps));
+      if (n !== DJ.rateVal) { djPaintRate(n); djHaptic(); }
+    };
+    const up = () => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+    };
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+  });
+  card.querySelector("#drp-save").addEventListener("click", () => djCommitRate(DJ.rateVal));
+}
+function djCloseRate() {
+  const pop = document.getElementById("djr-ratepop");
+  if (pop) pop.style.display = "none";
 }
 async function djCommitRate(n) {
-  const pop = document.getElementById("djr-ratepop");
-  pop.style.display = "none";
+  djCloseRate();
   const v = DJ.videos[DJ.idx];
   if (!v) return;
   if (!ME) { toast("Log in to rate creations"); setTimeout(() => location.hash = "/login", 400); return; }
   try {
     const d = await api(`/api/video/${v.id}/rate`, { method: "POST", json: { score: n } });
     v.rating = { avg: d.avg, count: d.count, mine: n };
-    const rn = document.getElementById("djr-rate-n");
-    if (rn) rn.textContent = `${n}/5`;
-    toast(`Rated ${n}/5 — ${RATE_WORDS[n]}`);
+    const ra = document.getElementById("djr-rate-avg");
+    if (ra) ra.textContent = d.avg;
+    djHaptic();
+    toast(`Rated ${n}/5 — ${DJ_RATE_WORDS[n]}`);
   } catch (err) { toast(err.message, true); }
 }
 
@@ -581,12 +670,13 @@ function djEnterStory(id, label) {
   djEnter({ type: "story", id, label: "JOURNEY" }, 0);
 }
 
+
 // ---------------- shared immersive viewer (reused outside /discover) ----------------
 const VLISTS = {};
 function regList(name, vids) { VLISTS[name] = vids; }
 function openViewer(list, idx, label) {
   if (!list || !list.length) return;
-  if ((location.hash || "").startsWith("#/discover") && DJ.active) return; // already in the journey
+  if ((location.hash || "").startsWith("#/discover") && DJ.active) return;
   djTeardown();
   const root = document.getElementById("player-root");
   root.innerHTML = djShell();
@@ -595,13 +685,13 @@ function openViewer(list, idx, label) {
   djApplySoundBtn();
   DJ.source = { type: "viewer", label: label || "WATCH" };
   DJ.curKey = "viewer:" + Date.now();
-  DJ.videos = list; DJ.pool = []; DJ.done = true; DJ.positions = DJ.positions || new Map();
+  DJ.videos = list; DJ.pool = []; DJ.done = true; DJ.positions = new Map();
+  DJ.idx = Math.max(0, Math.min(idx || 0, list.length - 1));
   const srcEl = document.getElementById("djr-src"); if (srcEl) srcEl.textContent = DJ.source.label;
-  djBuildTrack();
-  const track = document.getElementById("djr-track");
-  if (track) { track.addEventListener("scroll", djOnScroll, { passive: true }); djArmGestures(track); }
-  const i = Math.max(0, Math.min(idx || 0, list.length - 1));
-  djScrollTo(i, false); djActivate(i);
+  djArmPager();
+  djPaintWindow();
+  djCenter();
+  djActivateCurrent();
 }
 function closeViewer() {
   djTeardown();
@@ -621,42 +711,16 @@ function viewerFromEl(el) {
   return false;
 }
 
-// ---------------- wiring (delegated) ----------------
-document.addEventListener("pointerdown", e => {
-  const g = e.target.closest("#drp-gauge");
-  if (!g) return;
-  e.preventDefault();
-  const move = ev => {
-    const r = g.getBoundingClientRect();
-    const rel = 1 - (ev.clientY - r.top) / r.height;
-    const n = Math.max(1, Math.min(5, Math.ceil(rel * 5)));
-    [...g.children].forEach(c => c.classList.toggle("on", +c.dataset.n <= n));
-    g.dataset.peek = n;
-  };
-  move(e);
-  const up = () => {
-    document.removeEventListener("pointermove", move);
-    document.removeEventListener("pointerup", up);
-    const n = +g.dataset.peek || 0;
-    if (n) djCommitRate(n);
-  };
-  document.addEventListener("pointermove", move);
-  document.addEventListener("pointerup", up);
-});
-
+// ---------------- global wiring ----------------
 document.addEventListener("click", e => {
   const pop = e.target.closest("#djr-ratepop");
-  if (pop && !e.target.closest(".drp-card")) pop.style.display = "none";
+  if (pop && !e.target.closest(".drp-card")) djCloseRate();
 });
 
-document.addEventListener("dj-route", () => {});
-
-// resize: re-snap
 window.addEventListener("resize", () => {
-  if (DJ.active && document.getElementById("djr-track")) djScrollTo(DJ.idx, false);
+  if (DJ.active && djWin()) { djPaintWindow(); djCenter(); }
 });
 
-// ---------------- act delegation for discovery ----------------
 document.addEventListener("click", async e => {
   const el = e.target.closest("[data-act]");
   if (!el) return;
