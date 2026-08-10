@@ -913,6 +913,8 @@ def discover_feed():
     f = request.args.get("filter") or "trending"
     try: limit = min(int(request.args.get("limit", 30)), 50)
     except ValueError: limit = 30
+    try: offset = max(int(request.args.get("offset", 0)), 0)
+    except ValueError: offset = 0
     qstr = (request.args.get("q") or "").strip()
     if qstr:
         like = f"%{qstr}%"
@@ -923,20 +925,20 @@ def discover_feed():
                      ORDER BY v.id DESC LIMIT ?""", (like, like, like, like, like, like, limit))
         return jsonify(videos=videos_pub(rows, me), filter=f, q=qstr)
     if f == "new":
-        rows = qa("SELECT * FROM videos WHERE status='approved' ORDER BY id DESC LIMIT ?", (limit,))
+        rows = qa("SELECT * FROM videos WHERE status='approved' ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset))
     elif f == "originals":
-        rows = qa("SELECT * FROM videos WHERE status='approved' AND kind='creation' ORDER BY id DESC LIMIT ?", (limit,))
+        rows = qa("SELECT * FROM videos WHERE status='approved' AND kind='creation' ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset))
     elif f == "challenges":
-        rows = qa("SELECT * FROM videos WHERE status='approved' AND kind IN ('recreate','beatit') ORDER BY id DESC LIMIT ?", (limit,))
+        rows = qa("SELECT * FROM videos WHERE status='approved' AND kind IN ('recreate','beatit') ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset))
     elif f == "champions":
-        rows = qa("SELECT * FROM videos WHERE kind='beatit' AND score IS NOT NULL ORDER BY score DESC LIMIT ?", (limit,))
+        rows = qa("SELECT * FROM videos WHERE kind='beatit' AND score IS NOT NULL ORDER BY score DESC LIMIT ? OFFSET ?", (limit, offset))
     else:
         rows = qa("""SELECT v.*, (SELECT COUNT(*) FROM likes l WHERE l.video_id=v.id) lc,
                        (SELECT COUNT(*) FROM comments cm WHERE cm.video_id=v.id) cc,
                        (SELECT COUNT(*) FROM ratings rt WHERE rt.video_id=v.id) rc,
                        (SELECT COALESCE(AVG(r2.score),0) FROM ratings r2 WHERE r2.video_id=v.id) ra
                      FROM videos v WHERE v.status='approved'
-                     ORDER BY (COALESCE(v.views,0) + lc*3 + cc*4 + rc*6 + ra*rc*2) DESC, v.id DESC LIMIT ?""", (limit,))
+                     ORDER BY (COALESCE(v.views,0) + lc*3 + cc*4 + rc*6 + ra*rc*2) DESC, v.id DESC LIMIT ? OFFSET ?""", (limit, offset))
     return jsonify(videos=videos_pub(rows, me), filter=f)
 
 # ---------------------------------------------------------------- leaderboard & records

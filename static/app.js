@@ -217,9 +217,10 @@ function initNative() {
   if (P.App && P.App.addListener) {
     P.App.addListener("backButton", ({ canGoBack }) => {
       const path = (location.hash || "#/").slice(1).split("?")[0] || "/";
-      const atRoot = ["", "/", "/challenges", "/discover", "/leaderboard"].includes(path);
       if (PLAYER_OPEN) { closePlayer(); return; }
       if (document.querySelector("#modal-root .modal-backdrop, #modal-root .sheet-backdrop")) { document.querySelector("#modal-root").innerHTML = ""; return; }
+      if (path === "/discover") { location.hash = "/"; return; }
+      const atRoot = ["", "/", "/challenges", "/leaderboard"].includes(path);
       if (atRoot || !canGoBack) P.App.exitApp();
       else history.back();
     });
@@ -2058,6 +2059,7 @@ function routeLine() {
 }
 async function route() {
   if (PLAYER_OPEN) closePlayer();
+  if (typeof djTeardown === "function") djTeardown();
   routeLine();
   const raw = (location.hash || "#/").slice(1);
   const [path, qs] = raw.split("?");
