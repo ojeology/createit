@@ -3,7 +3,7 @@
   "appName": "CreateIt",
   "webDir": "www",
   "server": {
-    "url": "https://createit.onrender.com",
+    "url": "https://createit-icu7.onrender.com",
     "androidScheme": "https"
   },
   "backgroundColor": "#0a0b0e",
