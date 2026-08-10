@@ -557,7 +557,9 @@ def challenge_detail(cid):
     history = [{"user": user_pub(x["user_id"]), "score": x["score"], "video_id": x["video_id"],
                 "achieved_at": x["achieved_at"], "superseded_at": x["superseded_at"]}
                for x in qa("SELECT * FROM champions_history WHERE challenge_id=? ORDER BY achieved_at DESC LIMIT 6", (cid,))]
-    return jsonify(challenge=challenge_pub(r, me), leaderboard=board, attempts=attempts, beatits=beatits, history=history)
+    champ_vid = get_video(r["champion_video_id"]) if r["champion_video_id"] else None
+    return jsonify(challenge=challenge_pub(r, me), leaderboard=board, attempts=attempts, beatits=beatits, history=history,
+                   champion_video=video_pub(champ_vid, me) if champ_vid else None)
 
 @app.get("/api/video/<int:vid>")
 def video_detail(vid):
@@ -626,11 +628,13 @@ def profile(username):
     attempts = q1("SELECT COUNT(*) c FROM videos WHERE user_id=? AND kind='recreate'", (u["id"],))["c"]
     creations = q1("SELECT COUNT(*) c FROM videos WHERE user_id=? AND kind='creation'", (u["id"],))["c"]
     beatit = q1("SELECT COUNT(*) c FROM videos WHERE user_id=? AND kind='beatit'", (u["id"],))["c"]
+    is_self = bool(me and me["id"] == u["id"])
+    vis = "" if is_self else " AND status='approved'"
     journeys = []
-    for row in qa("SELECT DISTINCT challenge_id FROM videos WHERE user_id=? AND kind IN ('recreate','beatit') ORDER BY challenge_id DESC", (u["id"],)):
+    for row in qa(f"SELECT DISTINCT challenge_id FROM videos WHERE user_id=? AND kind IN ('recreate','beatit'){vis} ORDER BY challenge_id DESC", (u["id"],)):
         ch = get_challenge(row["challenge_id"])
         if not ch: continue
-        atts = qa("SELECT id, attempt_no, score, kind, created_at FROM videos WHERE challenge_id=? AND user_id=? AND kind='recreate' ORDER BY attempt_no", (ch["id"], u["id"]))
+        atts = qa(f"SELECT id, attempt_no, score, kind, created_at FROM videos WHERE challenge_id=? AND user_id=? AND kind='recreate'{vis} ORDER BY attempt_no", (ch["id"], u["id"]))
         bt = q1("SELECT id, score FROM videos WHERE challenge_id=? AND user_id=? AND kind='beatit'", (ch["id"], u["id"]))
         journeys.append({
             "challenge": {"id": ch["id"], "code": ch["code"], "title": ch["title"], "stage": ch["stage"]},
@@ -639,14 +643,14 @@ def profile(username):
             "completed": any(a["score"] is not None and a["score"] >= 100 for a in atts),
             "won": ch["champion_id"] == u["id"],
         })
-    creation_list = videos_pub(qa("SELECT * FROM videos WHERE user_id=? AND kind='creation' ORDER BY id DESC", (u["id"],)), me)
-    uploads = videos_pub(qa("SELECT * FROM videos WHERE user_id=? ORDER BY id DESC", (u["id"],)), me)
-    attempts = videos_pub(qa("SELECT * FROM videos WHERE user_id=? AND kind='recreate' ORDER BY id DESC LIMIT 60", (u["id"],)), me)
+    creation_list = videos_pub(qa(f"SELECT * FROM videos WHERE user_id=? AND kind='creation'{vis} ORDER BY id DESC", (u["id"],)), me)
+    uploads = videos_pub(qa(f"SELECT * FROM videos WHERE user_id=?{vis} ORDER BY id DESC", (u["id"],)), me)
+    attempts = videos_pub(qa(f"SELECT * FROM videos WHERE user_id=? AND kind='recreate'{vis} ORDER BY id DESC LIMIT 60", (u["id"],)), me)
     records = [{"challenge": {"id": c["id"], "code": c["code"], "title": c["title"]}, "score": c["champion_score"],
                 "unbeaten_days": days_ago(c["champion_at"])} for c in qa("SELECT * FROM challenges WHERE champion_id=? ORDER BY champion_at DESC", (u["id"],))]
     created = challenges_pub(qa("SELECT * FROM challenges WHERE creator_id=? ORDER BY id DESC", (u["id"],)), me)
     best_row = q1("SELECT MAX(score) s FROM videos WHERE user_id=? AND kind='recreate' AND score IS NOT NULL", (u["id"],))
-    beatit_list = videos_pub(qa("SELECT * FROM videos WHERE user_id=? AND kind='beatit' ORDER BY id DESC", (u["id"],)), me)
+    beatit_list = videos_pub(qa(f"SELECT * FROM videos WHERE user_id=? AND kind='beatit'{vis} ORDER BY id DESC", (u["id"],)), me)
     return jsonify(user=pub, stats={"champion": len(champs), "completed": completed, "attempts": attempts,
                                      "creations": creations, "beatit": beatit,
                                      "created": len(created), "best_score": best_row["s"]},
@@ -752,7 +756,7 @@ def upload(u):
         if not ch: return jsonify(error="Pick a challenge"), 400
         if ch["stage"] != "recreate_it": return jsonify(error=f"{ch['code']} is not in the RECREATE IT stage"), 400
         n = q1("SELECT COUNT(*) c FROM videos WHERE challenge_id=? AND user_id=? AND kind='recreate'", (cid, u["id"]))["c"] + 1
-        q("INSERT INTO videos (user_id, kind, challenge_id, title, description, file, status, attempt_no, created_at) VALUES (?,?,?,?,?,?, 'approved', ?, ?)",
+        q("INSERT INTO videos (user_id, kind, challenge_id, title, description, file, status, attempt_no, created_at) VALUES (?,?,?,?,?,?, 'pending', ?, ?)",
           (u["id"], "recreate", cid, title or f"Attempt #{n}", desc, fname, n, now_iso()))
         vid = q1("SELECT last_insert_rowid() id")["id"]
         if ch["creator_id"] != u["id"]:
@@ -984,9 +988,10 @@ def admin_queue(u):
 def admin_review(u):
     d = request.get_json(silent=True) or {}
     r = get_video(d.get("video_id", 0))
-    if not r or r["status"] != "pending": return jsonify(error="Not a pending submission"), 404
+    if not r or r["status"] not in ("pending", "rejected", "approved"): return jsonify(error="Not a reviewable submission"), 404
     action = d.get("action")
     if action == "reject":
+        if r["status"] not in ("pending", "approved"): return jsonify(error="Only pending or approved submissions can be rejected"), 400
         reason = (d.get("reason") or "").strip()[:300]
         q("UPDATE videos SET status='rejected', reject_reason=? WHERE id=?", (reason, r["id"]))
         notify(r["user_id"], "review", f"Your submission “{r['title']}” was not selected this time." + (f" Reason: {reason}" if reason else " Keep creating — the next one might be it."), "/notifications")
@@ -1021,6 +1026,8 @@ def admin_score(u):
     if not (0 <= score <= 120): return jsonify(error="Score must be 0–120"), 400
     prev = r["score"]
     q("UPDATE videos SET score=?, eval_status='evaluated', evaluated_at=? WHERE id=?", (score, now_iso(), r["id"]))
+    if r["status"] == "pending":
+        q("UPDATE videos SET status='approved' WHERE id=?", (r["id"],))
     if r["kind"] == "recreate" and r["challenge_id"]:
         ch = get_challenge(r["challenge_id"])
         if (prev is None or prev < 100) and score >= 100:
@@ -1110,6 +1117,14 @@ def admin_sponsor(u):
     q("UPDATE challenges SET sponsor=? WHERE id=?", (sponsor, ch["id"]))
     commit()
     return jsonify(ok=True, sponsor=sponsor)
+
+@app.get("/api/admin/submissions")
+@require_admin
+def admin_submissions(u):
+    st = request.args.get("status") or "pending"
+    if st not in ("pending", "approved", "rejected"): st = "pending"
+    rows = qa("SELECT * FROM videos WHERE status=? ORDER BY id DESC LIMIT 60", (st,))
+    return jsonify(submissions=videos_pub(rows, u), status=st)
 
 @app.get("/api/admin/dashboard")
 @require_admin

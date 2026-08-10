@@ -308,9 +308,9 @@ function renderChrome() {
 
   const items = [
     { ico: "home", label: "HOME", path: "/" },
-    { ico: "flame", label: "ARENA", path: "/challenges" },
-    { ico: "plus", label: "CREATE", path: "/create", special: true },
     { ico: "eye", label: "DISCOVER", path: "/discover" },
+    { ico: "plus", label: "CREATE", path: "/create", special: true },
+    { ico: "flame", label: "ARENA", path: "/challenges" },
     { ico: "user", label: "PROFILE", path: ME ? "/user/" + ME.username : "/login" },
   ];
   const route = location.hash.slice(1).split("?")[0] || "/";
@@ -328,9 +328,9 @@ function renderChrome() {
     <a data-nav="/" href="#/" aria-label="CreateIt home">${brandHTML(28)}</a>
     <span class="tagline">Create It · Recreate It · Beat It</span>
     <button class="rail-item ${route === "/" ? "active" : ""}" data-nav="/"><span class="ico">${ic("home", 18)}</span>Home</button>
-    <button class="rail-item ${route.startsWith("/challenges") ? "active" : ""}" data-nav="/challenges"><span class="ico">${ic("flame", 18)}</span>Arena</button>
-    <button class="rail-item rail-create" data-act="create-sheet"><span class="ico">${ic("plus", 18)}</span>Create</button>
     <button class="rail-item ${route.startsWith("/discover") ? "active" : ""}" data-nav="/discover"><span class="ico">${ic("eye", 18)}</span>Discover</button>
+    <button class="rail-item rail-create" data-act="create-sheet"><span class="ico">${ic("plus", 18)}</span>Create</button>
+    <button class="rail-item ${route.startsWith("/challenges") ? "active" : ""}" data-nav="/challenges"><span class="ico">${ic("flame", 18)}</span>Arena</button>
     <button class="rail-item ${route.startsWith("/attempts") ? "active" : ""}" data-nav="/attempts"><span class="ico">${ic("target", 18)}</span>Attempts</button>
     <button class="rail-item ${route.startsWith("/leaderboard") ? "active" : ""}" data-nav="/leaderboard"><span class="ico">${ic("trophy", 18)}</span>Ranks</button>
     <button class="rail-item ${route.startsWith("/notifications") ? "active" : ""}" data-nav="/notifications"><span class="ico">${ic("bell", 18)}</span>Notifications${unread ? ` <span class="dot-badge" style="position:static;margin-left:4px">${unread}</span>` : ""}</button>
@@ -476,7 +476,11 @@ document.addEventListener("click", async e => {
   const act = el.dataset.act;
   const vid = el.dataset.vid;
   try {
-    if (act === "watch" || act === "open-video") { e.stopPropagation(); openPlayer(vid); }
+    if (act === "watch" || act === "open-video") {
+      e.stopPropagation();
+      if (typeof viewerFromEl === "function" && viewerFromEl(el)) return;
+      openPlayer(vid);
+    }
     else if (act === "stage-tab") {
       if (!HOME_DATA) return;
       $$(".st-tab").forEach(t => t.classList.toggle("active", t === el));
@@ -664,13 +668,17 @@ async function viewHome() {
   const d = await api("/api/home");
   HOME_DATA = d;
   const h = d.hero;
+  if (typeof regList === "function") {
+    if (h) regList("home-hero", [h.original_video]);
+    regList("home-feed", d.hero_feed || []);
+    regList("home-verified", d.hero_success || []);
+  }
   return `
   ${tickerHTML(d)}
 
   ${h ? `
-  ${h ? `
   <div class="hero-stage">
-    <div class="hero-media vid-frame">
+    <div class="hero-media vid-frame" data-act="watch" data-vid="${h.original_video.id}" data-vlist="home-hero" style="cursor:pointer">
       <video id="hero-video" src="${h.original_video.src}" poster="${h.original_video.poster || ""}" autoplay muted loop playsinline preload="auto"></video>
       <div class="hero-grad"></div>
       <div class="hero-top">
@@ -699,14 +707,14 @@ async function viewHome() {
       <div class="hs"><b data-count="${h.qualified}">0</b><span>qualified</span></div>
       ${h.stage === "recreate_it" && h.days_left != null ? `<div class="hs"><b>${h.days_left}d</b><span>left</span></div>` : ""}
     </div>
-  </div>` : `<div class="empty">${ic("film", 22)}<br>The Arena is waiting for its first challenge.</div>`}
+  </div>
 
   ${secHead("", "refresh", "Latest recreations", "the community is attempting it right now")}
-  <div class="feed-strip">${d.hero_feed.map(feedCard).join("")}</div>` : ""}
+  <div class="feed-strip" data-vlist="home-feed" data-vlabel="LIVE ATTEMPTS">${d.hero_feed.map(feedCard).join("")}</div>` : `<div class="empty">${ic("film", 22)}<br>The Arena is waiting for its first challenge.</div>`}
 
   ${d.hero_success.length ? `
   ${secHead("", "check", "Verified — 100% recreations", "these people proved they can do it")}
-  <div class="feed-strip verified-strip">${d.hero_success.map(feedCard).join("")}</div>` : ""}
+  <div class="feed-strip verified-strip" data-vlist="home-verified" data-vlabel="VERIFIED 100%">${d.hero_success.map(feedCard).join("")}</div>` : ""}
 
   ${secHead("", "crown", "Current champion", "")}
   ${h.champion ? `
@@ -888,6 +896,12 @@ function stageTrack(stage) {
 async function viewChallenge(id) {
   const d = await api(`/api/challenge/${id}`);
   const c = d.challenge, m = c.mine;
+  if (typeof regList === "function") {
+    regList("ch-orig-" + c.id, [c.original_video]);
+    regList("ch-att-" + c.id, d.attempts || []);
+    regList("ch-beat-" + c.id, d.beatits || []);
+    if (d.champion_video) regList("ch-champ-" + c.id, [d.champion_video]);
+  }
   let cta = "";
   if (c.stage === "recreate_it") {
     cta = ME ? `<button class="btn btn-teal" data-nav="/create?kind=recreate&challenge=${c.id}">${ic("refresh",14)} RECREATE IT</button>`
@@ -942,7 +956,7 @@ async function viewChallenge(id) {
       <div class="cp-name">@${esc(champ.user.username)}</div>
       <p style="color:var(--mut);font-size:13px;margin-top:4px">Final Beat It score <b style="color:var(--champ)">${champ.score}%</b> · crowned ${timeAgo(champ.at)} · unbeaten ${champ.unbeaten_days} day${champ.unbeaten_days === 1 ? "" : "s"}. Records exist to be broken.</p>
     </div>
-    <button class="btn btn-gold" data-act="watch" data-vid="${champ.video_id}">${ic("play", 14)} WATCH THE WIN</button>
+    <button class="btn btn-gold" data-act="watch" data-vid="${champ.video_id}" data-vlist="ch-champ-${c.id}">${ic("play", 14)} WATCH THE WIN</button>
   </div>` : ""}
   ${d.history && d.history.length ? `
   ${secHead("", "disc", "CHALLENGE HISTORY", "previous champions — records never disappear")}
@@ -953,7 +967,7 @@ async function viewChallenge(id) {
     ${x.video_id ? `<button class="btn btn-sm" data-act="watch" data-vid="${x.video_id}">${ic("play", 12)} WATCH</button>` : ""}
   </div>`).join("")}` : ""}
   <div class="bench">
-    <div class="b-thumb" data-act="watch" data-vid="${c.original_video.id}">${thumb(c.original_video)}</div>
+    <div class="b-thumb" data-act="watch" data-vid="${c.original_video.id}" data-vlist="ch-orig-${c.id}">${thumb(c.original_video)}</div>
     <div style="flex:1;min-width:200px">
       <span class="pill-mini pm-violet">THE BENCHMARK</span>
       <h3>THE ORIGINAL CREATION</h3>
@@ -978,9 +992,9 @@ async function viewChallenge(id) {
     </div>`).join("") : `<div class="empty">${ic("target", 22)}<br>Be the first to attempt it.</div>`}
   ${c.stage !== "champion" && d.beatits.length ? `
   <div class="sec"><h2>${ic("zap",18)} BEAT IT SUBMISSIONS</h2><span class="sub">one final shot each</span><span class="sec-rule"></span></div>
-  <div class="grid3">${d.beatits.map(v => videoCard(v)).join("")}</div>` : ""}
+  <div class="grid3" data-vlist="ch-beat-${c.id}" data-vlabel="BEAT IT">${d.beatits.map(v => videoCard(v)).join("")}</div>` : ""}
   <div class="sec"><h2>${ic("flame",18)} RECENT ATTEMPTS</h2><span class="sec-rule"></span></div>
-  ${d.attempts.length ? `<div class="grid3">${d.attempts.map(v => videoCard(v)).join("")}</div>` : `<div class="empty">${ic("target", 22)}<br>Be the first to attempt it.</div>`}`;
+  ${d.attempts.length ? `<div class="grid3" data-vlist="ch-att-${c.id}" data-vlabel="ATTEMPTS">${d.attempts.map(v => videoCard(v)).join("")}</div>` : `<div class="empty">${ic("target", 22)}<br>Be the first to attempt it.</div>`}`;
 }
 
 async function viewCreate(query) {
@@ -1133,7 +1147,7 @@ function profTabHTML(tab) {
     ${d.uploads.length ? d.uploads.map(v => {
       const [label, cls] = uploadStatus(v);
       return `<div class="up-row">
-        <div class="up-th" data-act="open-video" data-vid="${v.id}">${thumb(v)}</div>
+        <div class="up-th" data-act="open-video" data-vid="${v.id}" data-vlist="prof-uploads">${thumb(v)}</div>
         <div class="up-mid"><div class="up-t">${esc(v.title)}</div>
           <div class="up-s"><span>${timeAgo(v.created_at)}</span><span>${ic("eye", 11)} ${v.views || 0}</span><span>${ic("heart", 11)} ${v.likes}</span>
           ${v.challenge ? `<span style="color:var(--ice)">${esc(v.challenge.code)}</span>` : ""}</div></div>
@@ -1142,7 +1156,7 @@ function profTabHTML(tab) {
     }).join("") : `<div class="empty">${ic("spark", 22)}<br>What can you do that nobody else can?</div>`}`;
   }
   if (tab === "attempts") {
-    return d.attempts.length ? `<div class="grid3">${d.attempts.map(v => videoCard(v)).join("")}</div>`
+    return d.attempts.length ? `<div class="grid3" data-vlist="prof-attempts" data-vlabel="ATTEMPTS">${d.attempts.map(v => videoCard(v)).join("")}</div>`
       : `<div class="empty">${ic("target", 22)}<br>Every legend starts at attempt #1.</div>`;
   }
   if (tab === "journeys") {
@@ -1189,6 +1203,11 @@ function renderProfTab(tab) {
 async function viewProfile(username) {
   const d = await api(`/api/user/${username}`);
   PROF = d; PROF_TAB = "creations";
+  if (typeof regList === "function") {
+    regList("prof-uploads", d.uploads || []);
+    regList("prof-attempts", d.attempts || []);
+    regList("prof-creations", d.creations || []);
+  }
   const u = d.user, st = d.stats;
   const own = ME && ME.username === u.username;
   const followBtn = ME && !own
@@ -1419,6 +1438,7 @@ async function renderSearchResults(body, q) {
 async function viewCategory(slug) {
   const d = await api(`/api/category/${encodeURIComponent(slug)}`).catch(() => null);
   if (!d) return `<div class="err-block"><h3>THIS TOPIC HAS LEFT THE ARENA</h3><p>It may have been renamed.</p><br><button class="btn btn-fire" data-nav="/discover">BACK TO DISCOVERY</button></div>`;
+  if (typeof regList === "function") regList("cat-" + slug, d.videos || []);
   return `
   <div class="page-head">
     <span class="crumb">DISCOVERY / TOPIC</span>
@@ -1426,17 +1446,25 @@ async function viewCategory(slug) {
     <div class="meta-row">${d.challenges.length} challenge${d.challenges.length === 1 ? "" : "s"} · ${d.videos.length} videos${d.category.parent ? ` · under ${esc(d.category.parent)}` : ""}</div>
   </div>
   ${d.challenges.length ? `${secHead("", "flame", "CHALLENGES", "")}<div class="arena-grid">${d.challenges.map(arenaCard).join("")}</div>` : ""}
-  ${d.videos.length ? `${secHead("", "eye", "VIDEOS", "")}<div class="grid3">${d.videos.map(v => videoCard(v)).join("")}</div>`
+  ${d.videos.length ? `${secHead("", "eye", "VIDEOS", "")}<div class="grid3" data-vlist="cat-${d.category.slug}" data-vlabel="${esc(d.category.name).toUpperCase()}">${d.videos.map(v => videoCard(v)).join("")}</div>`
     : `<div class="empty">Nothing in this topic yet — be the first to CREATE IT.</div>`}`;
 }
 
 async function viewStory(jid) {
   const d = await api(`/api/journey-story/${encodeURIComponent(jid)}`).catch(() => null);
   if (!d) return `<div class="err-block"><h3>THIS STORY HAS LEFT THE ARENA</h3><br><button class="btn btn-fire" data-nav="/discover">BACK TO DISCOVERY</button></div>`;
+  if (typeof regList === "function") {
+    const storyList = [];
+    if (d.original) storyList.push(d.original);
+    (d.arc || []).forEach(v => storyList.push(v));
+    (d.beatits || []).forEach(v => storyList.push(v));
+    if (d.champion_video) storyList.push(d.champion_video);
+    regList("story-" + jid, storyList);
+  }
   let chNo = 0;
   const chapter = (label, v, cap, cls = "") => v ? `<div class="chapter ${cls}">
     <div class="ch-no"><b>${String(++chNo).padStart(2, "0")}</b>SCENE</div>
-    <div class="ch-th" data-act="open-video" data-vid="${v.id}">${thumb(v)}</div>
+    <div class="ch-th" data-act="open-video" data-vid="${v.id}" data-vlist="story-${jid}">${thumb(v)}</div>
     <div class="ch-body"><div class="ch-label">${label}</div>
       <div style="font-weight:700">${esc(v.title)}</div>
       <div class="ch-cap">${cap}</div></div>
@@ -1456,7 +1484,7 @@ async function viewStory(jid) {
     `@${esc(v.owner.username)} took one final shot at the original.`, v.score > 100 ? "champ-ch" : "")).join("")}
   ${d.champion_video && d.champion && !d.beatits.some(b => b.score > 100) ? `<div class="chapter champ-ch">
     <div class="ch-no"><b>${String(++chNo).padStart(2, "0")}</b>SCENE</div>
-    <div class="ch-th" data-act="open-video" data-vid="${d.champion_video.id}">${thumb(d.champion_video)}</div>
+    <div class="ch-th" data-act="open-video" data-vid="${d.champion_video.id}" data-vlist="story-${jid}">${thumb(d.champion_video)}</div>
     <div class="ch-body"><div class="ch-label" style="color:var(--gold)">CHAMPION</div>
       <div style="font-weight:700">@${esc(d.champion.username)}${d.challenge.champion ? ` — ${d.challenge.champion.score}%` : ""}</div>
       <div class="ch-cap">The crown. The record. The next challenger is already watching.</div></div>
@@ -1644,6 +1672,11 @@ async function viewAttempts() {
 async function viewJourney(cid, uid) {
   const d = await api(`/api/journey/${cid}/${uid}`);
   const c = d.challenge;
+  if (typeof regList === "function") {
+    const jl = [...d.attempts];
+    if (d.beatit) jl.push(d.beatit);
+    regList("jrn-" + cid + "-" + uid, jl);
+  }
   return `
   <div class="page-head">
     <span class="crumb">JOURNEY / <b>${esc(c.code)}</b></span>
@@ -1657,14 +1690,14 @@ async function viewJourney(cid, uid) {
     ${d.attempts.map(a => `
     <div class="j-row ${a.score >= 100 ? "hit" : ""}">
       <div class="jr-no"><span>ATTEMPT</span>#${a.attempt_no}</div>
-      <div class="jr-th" data-act="open-video" data-vid="${a.id}">${thumb(a)}</div>
+      <div class="jr-th" data-act="open-video" data-vid="${a.id}" data-vlist="jrn-${cid}-${uid}">${thumb(a)}</div>
       <div class="jr-meta">${timeAgo(a.created_at)} · ${ic("eye", 11)} ${a.views || 0} views<br>${a.score != null ? (a.score >= 100 ? "Recreate complete." : "The story continues.") : "Awaiting CreateIt evaluation."}</div>
       ${scoreBadge(a.score)}
     </div>`).join("")}
     ${d.beatit ? `
     <div class="j-row beat">
       <div class="jr-no"><span>BEAT IT</span>${ic("zap", 16)}</div>
-      <div class="jr-th" data-act="open-video" data-vid="${d.beatit.id}">${thumb(d.beatit)}</div>
+      <div class="jr-th" data-act="open-video" data-vid="${d.beatit.id}" data-vlist="jrn-${cid}-${uid}">${thumb(d.beatit)}</div>
       <div class="jr-meta">The final submission. One shot.</div>
       ${scoreBadge(d.beatit.score)}
     </div>` : ""}
@@ -1738,35 +1771,67 @@ function viewAuth(mode, note) {
 }
 
 // ---------------- admin ----------------
+function admSubRow(v, st) {
+  const kindChip = v.kind === "creation" ? '<span class="pill-mini pm-violet">CREATE IT</span>'
+    : v.kind === "beatit" ? '<span class="pill-mini pm-fire">BEAT IT</span>'
+    : '<span class="pill-mini pm-teal">RECREATE</span>';
+  const statusChip = st === "pending" ? '<span class="st-chip stc-pending">PENDING</span>'
+    : st === "rejected" ? '<span class="st-chip stc-rejected">REJECTED</span>'
+    : '<span class="st-chip stc-approved">APPROVED</span>';
+  const acts = st === "pending"
+    ? `<button class="mini-btn" data-review="${v.id}" data-review-act="approve">APPROVE</button>
+       ${v.kind === "creation" ? `<button class="mini-btn" data-mkch="${v.id}" style="background:var(--grad-fire);border:none;color:#fff;font-weight:800">${ic("trophy", 12)} MAKE CHALLENGE</button>` : ""}
+       <button class="mini-btn" data-review="${v.id}" data-review-act="reject">REJECT</button>`
+    : st === "rejected"
+    ? `<button class="mini-btn" data-review="${v.id}" data-review-act="approve">RESTORE</button>`
+    : `<button class="mini-btn" data-review="${v.id}" data-review-act="reject">REJECT</button>`;
+  return `<div class="adm-row">
+    <video src="${v.src}#t=0.7" preload="metadata" muted playsinline></video>
+    <div class="ar-mid"><div class="t">${esc(v.title)} ${kindChip}${v.nominated ? ' <span class="pill-mini pm-fire">SELF-NOMINATED</span>' : ""}</div>
+      <div class="s">@${esc(v.owner.username)} · ${v.challenge ? esc(v.challenge.code) : "no challenge"} · ${timeAgo(v.created_at)}${st === "approved" && v.score != null ? ` · scored ${v.score}%` : ""}</div></div>
+    <div class="ar-acts">${acts}${statusChip}</div>
+    ${v.kind === "creation" && st === "pending" ? `<div id="mkch-${v.id}" style="display:none;width:100%;border-top:1px dashed var(--line2);padding-top:10px;margin-top:4px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input class="input" id="ch-title-${v.id}" value="${esc(v.title)}" style="flex:2;min-width:160px">
+        <select class="input" id="ch-cat-${v.id}" style="width:150px"><option value="">No category</option>${(window.__admCats || []).map(c => `<option value="${c.id}">${esc(c.parent ? c.parent + " · " : "")}${esc(c.name)}</option>`).join("")}</select>
+        <input class="input" id="ch-target-${v.id}" type="number" value="100" min="1" style="width:110px" title="Recreate target">
+        <label style="font-size:12px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="ch-featured-${v.id}"> Creator of the Week</label>
+        <button class="btn btn-sm btn-fire" data-review="${v.id}" data-review-act="approve" data-challenge="1">CREATE THE CHALLENGE</button>
+      </div>
+    </div>` : ""}
+  </div>`;
+}
+function renderAdminSubs(list, st) {
+  return list.length ? list.map(v => admSubRow(v, st)).join("") : `<div class="empty">No ${st} submissions.</div>`;
+}
+
 async function viewAdmin() {
   if (!ME?.is_admin) return `<div class="empty">${ic("shield",16)} Admins only.</div>`;
   const [q1d, chd, ud, dbd, catd] = await Promise.all([api("/api/admin/queue"), api("/api/admin/challenges"), api("/api/admin/users"), api("/api/admin/dashboard"), api("/api/categories")]);
   const stages = ["create_it", "recreate_it", "recreate_closed", "beat_it", "judging", "champion", "archived"];
   const cats = catd.categories || [];
-  setTimeout(() => {
-    // review actions
-    $$("[data-review]").forEach(b => b.onclick = async () => {
-      const id = b.dataset.review, act = b.dataset.reviewAct;
-      const payload = { video_id: +id, action: act };
-      if (act === "reject") {
-        const reason = prompt("Rejection reason (optional — the creator will see this):");
-        if (reason === null) return;
-        payload.reason = reason;
-      }
-      if (act === "approve" && b.dataset.challenge === "1") {
-        payload.make_challenge = true;
-        payload.title = $(`#ch-title-${id}`).value;
-        payload.target = $(`#ch-target-${id}`).value;
-        payload.featured = $(`#ch-featured-${id}`).checked ? 1 : 0;
-        payload.category_id = $(`#ch-cat-${id}`)?.value || "";
-      }
-      try { await api("/api/admin/review", { method: "POST", json: payload }); toast(act === "reject" ? "Submission rejected." : "Approved."); route(); refreshMe().then(renderChrome); }
-      catch (e) { toast(e.message, true); }
-    });
-    $$("[data-mkch]").forEach(b => b.onclick = () => {
+  window.__admCats = cats;
+  window.__bindAdminReview = () => {
+    $$("[data-review]:not([data-bound])").forEach(b => { b.dataset.bound = "1"; b.onclick = adminReviewClick(b); });
+    $$("[data-mkch]:not([data-bound])").forEach(b => { b.dataset.bound = "1"; b.onclick = () => {
       const panel = $(`#mkch-${b.dataset.mkch}`);
-      panel.style.display = panel.style.display === "none" ? "block" : "none";
-    });
+      if (panel) panel.style.display = panel.style.display === "none" ? "block" : "none";
+    }; });
+  };
+  window.__adminSubs = async (st) => {
+    $$(".adm-tab").forEach(t => t.classList.toggle("active", t.dataset.ast === st));
+    const box = $("#adm-subs");
+    if (!box) return;
+    box.innerHTML = `<div class="loading" style="padding:24px 0"><div class="spinner"></div></div>`;
+    try {
+      const d = await api(`/api/admin/submissions?status=${st}`);
+      box.innerHTML = renderAdminSubs(d.submissions, st);
+      window.__bindAdminReview();
+    } catch (e) { box.innerHTML = `<div class="empty">Could not load submissions.</div>`; }
+  };
+  $$(".adm-tab").forEach(t => t.onclick = () => window.__adminSubs(t.dataset.ast));
+  setTimeout(() => {
+    window.__bindAdminReview();
     // scoring
     $$("[data-score]").forEach(b => b.onclick = async () => {
       const id = b.dataset.score;
@@ -1774,7 +1839,6 @@ async function viewAdmin() {
       try { await api("/api/admin/score", { method: "POST", json: { video_id: +id, score: +score } }); toast(`Scored ${score}%. Owner notified.`); route(); }
       catch (e) { toast(e.message, true); }
     });
-    // stage / target / featured / crown
     $$("[data-stage]").forEach(sel => sel.onchange = async () => {
       try { await api("/api/admin/stage", { method: "POST", json: { challenge_id: +sel.dataset.stage, stage: sel.value } }); toast("Stage updated."); route(); } catch (e) { toast(e.message, true); }
     });
@@ -1821,27 +1885,13 @@ async function viewAdmin() {
     <div class="stat-box teal"><div class="v">${q1d.stats.unscored}</div><div class="k">Awaiting score</div></div>
   </div>
 
-  <div class="adm-card"><h3>${ic("upload",14)} SUBMISSION REVIEW — Create It candidates</h3>
-    ${q1d.pending.length ? q1d.pending.map(v => `
-    <div class="adm-row">
-      <video src="${v.src}#t=0.7" preload="metadata" muted playsinline></video>
-      <div class="ar-mid"><div class="t">${esc(v.title)} ${v.nominated ? '<span class="pill-mini pm-fire">SELF-NOMINATED</span>' : ""}</div>
-        <div class="s">@${esc(v.owner.username)} · ${esc(v.description || "—")}</div></div>
-      <div class="ar-acts">
-        <button class="mini-btn" data-review="${v.id}" data-review-act="approve">Approve (Discover)</button>
-        <button class="mini-btn" data-mkch="${v.id}" style="background:var(--grad-fire);border:none;color:#fff;font-weight:800">${ic("trophy",12)} Make Challenge</button>
-        <button class="mini-btn" data-review="${v.id}" data-review-act="reject">Reject</button>
-      </div>
-      <div id="mkch-${v.id}" style="display:none;width:100%;border-top:1px dashed var(--line2);padding-top:10px;margin-top:4px">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <input class="input" id="ch-title-${v.id}" value="${esc(v.title)}" style="flex:2;min-width:160px">
-          <select class="input" id="ch-cat-${v.id}" style="width:150px"><option value="">No category</option>${cats.map(c => `<option value="${c.id}">${esc(c.parent ? c.parent + " · " : "")}${esc(c.name)}</option>`).join("")}</select>
-          <input class="input" id="ch-target-${v.id}" type="number" value="100" min="1" style="width:110px" title="Recreate target">
-          <label style="font-size:12px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="ch-featured-${v.id}"> Feature as Creator of the Week</label>
-          <button class="btn btn-sm btn-fire" data-review="${v.id}" data-review-act="approve" data-challenge="1">CREATE THE CHALLENGE</button>
-        </div>
-      </div>
-    </div>`).join("") : `<div class="empty">No pending submissions.</div>`}
+  <div class="adm-card"><h3>${ic("upload",14)} SUBMISSIONS — moderation pipeline</h3>
+    <div class="adm-tabs">
+      <button class="adm-tab active" data-ast="pending">PENDING</button>
+      <button class="adm-tab" data-ast="approved">APPROVED</button>
+      <button class="adm-tab" data-ast="rejected">REJECTED</button>
+    </div>
+    <div id="adm-subs">${renderAdminSubs(q1d.pending, "pending")}</div>
   </div>
 
   <div class="adm-card"><h3>${ic("target",14)} SCORING QUEUE — attempts awaiting evaluation</h3>
@@ -2138,3 +2188,25 @@ window.addEventListener("hashchange", () => {
   if (path.startsWith("/video/")) openVideoRoute(path.split("/")[2]);
   else route();
 })();
+
+
+function adminReviewClick(b) {
+  return async () => {
+    const id = b.dataset.review, act = b.dataset.reviewAct;
+    const payload = { video_id: +id, action: act };
+    if (act === "reject") {
+      const reason = prompt("Rejection reason (optional — the creator will see this):");
+      if (reason === null) return;
+      payload.reason = reason;
+    }
+    if (act === "approve" && b.dataset.challenge === "1") {
+      payload.make_challenge = true;
+      payload.title = $(`#ch-title-${id}`).value;
+      payload.target = $(`#ch-target-${id}`).value;
+      payload.featured = $(`#ch-featured-${id}`).checked ? 1 : 0;
+      payload.category_id = $(`#ch-cat-${id}`)?.value || "";
+    }
+    try { await api("/api/admin/review", { method: "POST", json: payload }); toast(act === "reject" ? "Submission rejected." : "Approved."); route(); refreshMe().then(renderChrome); }
+    catch (e) { toast(e.message, true); }
+  };
+}

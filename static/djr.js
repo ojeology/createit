@@ -3,10 +3,12 @@
    Swipe through people's abilities. One video is the screen.
    ============================================================ */
 const DJ = {
-  videos: [], idx: 0, muted: true, positions: new Map(),
+  videos: [], idx: 0, muted: false, positions: new Map(),
   source: null, curKey: "", loading: false, done: false, active: false,
-  batch: 12, raf: 0,
+  batch: 12, raf: 0, pool: [], offset: 0, loadingAdv: false, viewer: false,
 };
+function djShuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function djCanShuffle() { return DJ.source && (DJ.source.type === "trending" || DJ.source.type === "new"); }
 
 function djSourceKey(src) {
   if (src.type === "list") return "list:" + (src.videos && src.videos[0] ? src.videos[0].id : 0) + ":" + (src.videos ? src.videos.length : 0);
@@ -73,7 +75,7 @@ async function djBoot() {
   const root = document.getElementById("djr");
   if (!root) return;
   DJ.active = true;
-  try { DJ.muted = sessionStorage.getItem("dj-muted") !== "0"; } catch (e) {}
+  try { DJ.muted = sessionStorage.getItem("dj-muted") === "1"; } catch (e) {}
   djApplySoundBtn();
   const track = document.getElementById("djr-track");
   track.addEventListener("scroll", djOnScroll, { passive: true });
@@ -123,10 +125,20 @@ async function djEnter(source, startIdx) {
   const key = djSourceKey(source);
   if (key !== DJ.curKey || !DJ.videos.length) {
     DJ.source = source; DJ.curKey = key; DJ.done = false; DJ.positions.clear();
+    DJ.pool = []; DJ.offset = 0;
     djShowLoad(true);
-    DJ.videos = await djFetch(source, 0);
+    let vids = await djFetch(source, 0);
     djShowLoad(false);
-    if (source.type !== "trending" && source.type !== "new") DJ.done = true;
+    if (djCanShuffle() && vids.length) {
+      djShuffle(vids);
+      DJ.offset = vids.length;
+      DJ.pool = vids.slice(1);
+      vids = vids.slice(0, 1);
+    } else {
+      DJ.offset = vids.length;
+      if (source.type !== "trending" && source.type !== "new") DJ.done = true;
+    }
+    DJ.videos = vids;
     if (!DJ.videos.length) {
       const track = document.getElementById("djr-track");
       if (track) track.innerHTML = `<div class="djr-slide"><div class="djr-empty">${ic("film", 26)}<span>Nothing here yet — be the first to CREATE IT.</span></div></div>`;
@@ -213,20 +225,52 @@ function djActivate(i) {
   if (cur) {
     const pos = DJ.positions.get(i);
     if (pos != null && pos > 0.5) { try { cur.currentTime = pos; } catch (e) {} }
-    cur.play().catch(() => {});
+    cur.muted = DJ.muted;
+    const p = cur.play();
+    if (p) p.catch(() => {
+      cur.muted = true;
+      if (!DJ.muted) {
+        DJ.muted = true;
+        try { sessionStorage.setItem("dj-muted", "1"); } catch (e) {}
+        djApplySoundBtn(); djSoundHint();
+      }
+      cur.play().catch(() => {});
+    });
   }
   djUpdateOverlay();
-  if (DJ.source && (DJ.source.type === "trending" || DJ.source.type === "new") &&
-      i >= DJ.videos.length - 3 && !DJ.loading && !DJ.done) djLoadMore();
+  if (djCanShuffle() && i >= DJ.videos.length - 2) djPreloadPoolSoon();
+}
+
+async function djRefillPool() {
+  if (DJ.done || !djCanShuffle() || DJ.loading) return;
+  DJ.loading = true;
+  const vids = await djFetch(DJ.source, DJ.offset);
+  DJ.loading = false;
+  if (!vids.length) { DJ.done = true; return; }
+  DJ.offset += vids.length;
+  DJ.pool = DJ.pool.concat(djShuffle(vids));
+}
+function djPreloadPoolSoon() {
+  if (djCanShuffle() && !DJ.done && DJ.pool.length < 4) djRefillPool();
 }
 
 function djAutoNext(i) {
   if (i + 1 < DJ.videos.length) { djScrollTo(i + 1, true); return; }
-  if (!DJ.done && DJ.source && (DJ.source.type === "trending" || DJ.source.type === "new")) {
-    djLoadMore().then(() => { if (i + 1 < DJ.videos.length) djScrollTo(i + 1, true); else djReplay(i); });
-    return;
-  }
+  if (djCanShuffle()) { djAdvance(); return; }
   djReplay(i);
+}
+async function djAdvance() {
+  if (DJ.loadingAdv) return;
+  DJ.loadingAdv = true;
+  if (!DJ.pool.length) await djRefillPool();
+  DJ.loadingAdv = false;
+  if (!DJ.pool.length) { djReplay(DJ.videos.length - 1); return; }
+  const next = DJ.pool.shift();
+  DJ.videos.push(next);
+  const track = document.getElementById("djr-track");
+  if (track) track.insertAdjacentHTML("beforeend", djSlideHTML(next, DJ.videos.length - 1));
+  djScrollTo(DJ.videos.length - 1, true);
+  djPreloadPoolSoon();
 }
 function djReplay(i) {
   const track = document.getElementById("djr-track");
@@ -304,6 +348,11 @@ function djRetry(i) {
 }
 
 // ---------------- sound ----------------
+function djSoundHint() {
+  const b = document.getElementById("djr-sound");
+  if (!b) return;
+  b.classList.remove("hint"); void b.offsetWidth; b.classList.add("hint");
+}
 function djApplySoundBtn() {
   const b = document.getElementById("djr-sound");
   if (!b) return;
@@ -514,6 +563,46 @@ function djEnterStory(id, label) {
   djEnter({ type: "story", id, label: "JOURNEY" }, 0);
 }
 
+// ---------------- shared immersive viewer (reused outside /discover) ----------------
+const VLISTS = {};
+function regList(name, vids) { VLISTS[name] = vids; }
+function openViewer(list, idx, label) {
+  if (!list || !list.length) return;
+  if ((location.hash || "").startsWith("#/discover") && DJ.active) return; // already in the journey
+  djTeardown();
+  const root = document.getElementById("player-root");
+  root.innerHTML = djShell();
+  DJ.viewer = true; DJ.active = true;
+  try { DJ.muted = sessionStorage.getItem("dj-muted") === "1"; } catch (e) {}
+  djApplySoundBtn();
+  DJ.source = { type: "viewer", label: label || "WATCH" };
+  DJ.curKey = "viewer:" + Date.now();
+  DJ.videos = list; DJ.pool = []; DJ.done = true; DJ.positions = DJ.positions || new Map();
+  const srcEl = document.getElementById("djr-src"); if (srcEl) srcEl.textContent = DJ.source.label;
+  djBuildTrack();
+  const track = document.getElementById("djr-track");
+  if (track) track.addEventListener("scroll", djOnScroll, { passive: true });
+  const i = Math.max(0, Math.min(idx || 0, list.length - 1));
+  djScrollTo(i, false); djActivate(i);
+}
+function closeViewer() {
+  djTeardown();
+  DJ.viewer = false;
+  const root = document.getElementById("player-root");
+  if (root) root.innerHTML = "";
+}
+function viewerFromEl(el) {
+  const wrap = el.closest("[data-vlist]");
+  const vid = el.dataset.vid;
+  if (wrap && VLISTS[wrap.dataset.vlist]) {
+    const list = VLISTS[wrap.dataset.vlist];
+    const idx = Math.max(0, list.findIndex(v => String(v.id) === String(vid)));
+    openViewer(list, idx, wrap.dataset.vlabel || "WATCH");
+    return true;
+  }
+  return false;
+}
+
 // ---------------- wiring (delegated) ----------------
 document.addEventListener("pointerdown", e => {
   const g = e.target.closest("#drp-gauge");
@@ -556,7 +645,7 @@ document.addEventListener("click", async e => {
   const act = el.dataset.act;
   if (!act.startsWith("dj-")) return;
   switch (act) {
-    case "dj-exit": location.hash = "/"; break;
+    case "dj-exit": if (DJ.viewer) closeViewer(); else location.hash = "/"; break;
     case "dj-sound": djToggleSound(); break;
     case "dj-browse": djOpenBrowse(); break;
     case "dj-close-browse": djCloseBrowse(); break;
