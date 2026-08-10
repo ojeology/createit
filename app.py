@@ -123,6 +123,7 @@ CREATE INDEX IF NOT EXISTS idx_ch_hist ON champions_history(challenge_id);
 CREATE INDEX IF NOT EXISTS idx_vc_cat ON video_categories(category_id);
 CREATE TABLE IF NOT EXISTS blocks(id INTEGER PRIMARY KEY, blocker_id INTEGER, blocked_id INTEGER, created_at TEXT, UNIQUE(blocker_id, blocked_id));
 CREATE TABLE IF NOT EXISTS password_resets(id INTEGER PRIMARY KEY, user_id INTEGER, code TEXT, expires_at TEXT, used INTEGER DEFAULT 0);
+CREATE TABLE IF NOT EXISTS comment_likes(id INTEGER PRIMARY KEY, comment_id INTEGER, user_id INTEGER, UNIQUE(comment_id, user_id));
 CREATE INDEX IF NOT EXISTS idx_cc_cat ON challenge_categories(category_id);
 """
 
@@ -200,6 +201,7 @@ def seed_if_empty():
     if not q1("SELECT 1 FROM challenges WHERE sponsor IS NOT NULL AND sponsor != ''"):
         q("UPDATE challenges SET sponsor='INDOMIE' WHERE id=3")
     for stmt in ("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''",
+                 "ALTER TABLE users ADD COLUMN avatar_photo TEXT DEFAULT ''",
                  "ALTER TABLE videos ADD COLUMN views INTEGER DEFAULT 0",
                  "ALTER TABLE videos ADD COLUMN reject_reason TEXT DEFAULT ''",
                  "ALTER TABLE videos ADD COLUMN eval_status TEXT DEFAULT 'pending'",
@@ -325,7 +327,8 @@ def users_pub_map(uids):
         keys = r.keys()
         out[i] = {
             "id": r["id"], "username": r["username"], "display_name": r["display_name"],
-            "avatar": r["avatar"], "color": r["color"], "bio": r["bio"], "is_admin": bool(r["is_admin"]),
+            "avatar": r["avatar"], "avatar_photo": (r["avatar_photo"] if "avatar_photo" in keys else "") or "",
+            "color": r["color"], "bio": r["bio"], "is_admin": bool(r["is_admin"]),
             "followers": fwers.get(i, 0), "following": fwing.get(i, 0),
             "socials": {"youtube": (r["youtube"] or "") if "youtube" in keys else "",
                         "tiktok": (r["tiktok"] or "") if "tiktok" in keys else "",
@@ -620,8 +623,13 @@ def video_detail(vid):
     r = get_video(vid)
     if not r: return jsonify(error="Not found"), 404
     q("UPDATE videos SET views=COALESCE(views,0)+1 WHERE id=?", (vid,)); commit(); r = get_video(vid)
-    cs = qa("SELECT c.*, u.username FROM comments c JOIN users u ON u.id=c.user_id WHERE video_id=? ORDER BY c.id DESC LIMIT 50", (vid,))
-    comments = [{"id": c["id"], "text": c["text"], "username": c["username"], "created_at": c["created_at"]} for c in cs]
+    cs = qa("SELECT c.*, u.username, u.avatar, u.avatar_photo, u.color FROM comments c JOIN users u ON u.id=c.user_id WHERE video_id=? ORDER BY c.id DESC LIMIT 50", (vid,))
+    me_id = me["id"] if me else None
+    lc = {a: b for a, b in qa("SELECT comment_id, COUNT(*) FROM comment_likes WHERE comment_id IN (" + ",".join("?" * max(1, len(cs))) + ") GROUP BY comment_id", tuple([c["id"] for c in cs] or [0]))} if cs else {}
+    mine = set(a for a, in qa("SELECT comment_id FROM comment_likes WHERE user_id=? AND comment_id IN (" + ",".join("?" * max(1, len(cs))) + ")", tuple([me_id] + [c["id"] for c in cs] or [me_id, 0]))) if cs and me_id else set()
+    comments = [{"id": c["id"], "text": c["text"], "username": c["username"], "avatar": c["avatar"],
+                 "avatar_photo": c["avatar_photo"] or "", "color": c["color"], "created_at": c["created_at"],
+                 "likes": lc.get(c["id"], 0), "liked": c["id"] in mine} for c in cs]
     return jsonify(video=video_pub(r, me), comments=comments)
 
 # ---------------------------------------------------------------- interactions
@@ -638,6 +646,18 @@ def like(u, vid):
             notify(r["user_id"], "like", f"@{u['username']} liked your video “{r['title'] or 'Untitled'}”", f"/video/{vid}")
     commit()
     return jsonify(liked=liked, likes=q1("SELECT COUNT(*) c FROM likes WHERE video_id=?", (vid,))["c"])
+
+@app.post("/api/comment/<int:cid>/like")
+@require_user
+def comment_like(u, cid):
+    c = q1("SELECT * FROM comments WHERE id=?", (cid,))
+    if not c: return jsonify(error="Not found"), 404
+    if q1("SELECT 1 FROM comment_likes WHERE comment_id=? AND user_id=?", (cid, u["id"])):
+        q("DELETE FROM comment_likes WHERE comment_id=? AND user_id=?", (cid, u["id"])); liked = False
+    else:
+        q("INSERT INTO comment_likes (comment_id, user_id) VALUES (?,?)", (cid, u["id"])); liked = True
+    commit()
+    return jsonify(liked=liked, likes=q1("SELECT COUNT(*) c FROM comment_likes WHERE comment_id=?", (cid,))["c"])
 
 @app.post("/api/video/<int:vid>/comment")
 @require_user
@@ -768,6 +788,42 @@ def me_update(u):
     fresh = q1("SELECT * FROM users WHERE id=?", (u["id"],))
     return jsonify(ok=True, me={**user_pub(u["id"]), "email": fresh["email"]})
 
+@app.post("/api/me/avatar-photo")
+@require_user
+def me_avatar_photo(u):
+    f = request.files.get("file")
+    if not f or not f.filename: return jsonify(error="Pick a photo"), 400
+    ext = os.path.splitext(f.filename)[1].lower()
+    if ext not in (".jpg", ".jpeg", ".png", ".webp"): return jsonify(error="JPG, PNG or WEBP only"), 400
+    fn = f"avatar_{u['id']}{ext}"
+    path = os.path.join(UPLOADS, "avatars")
+    os.makedirs(path, exist_ok=True)
+    # remove any previous avatar photo file
+    old = q1("SELECT avatar_photo FROM users WHERE id=?", (u["id"],))["avatar_photo"]
+    if old:
+        oldp = os.path.join(BASE, old.lstrip("/"))
+        if os.path.exists(oldp):
+            try: os.remove(oldp)
+            except OSError: pass
+    f.save(os.path.join(path, fn))
+    url = f"/uploads/avatars/{fn}?t={int(datetime.datetime.utcnow().timestamp())}"
+    q("UPDATE users SET avatar_photo=? WHERE id=?", (url, u["id"]))
+    commit()
+    return jsonify(ok=True, avatar_photo=url, me={**user_pub(u["id"]), "email": u["email"]})
+
+@app.post("/api/me/avatar-photo/remove")
+@require_user
+def me_avatar_photo_remove(u):
+    old = q1("SELECT avatar_photo FROM users WHERE id=?", (u["id"],))["avatar_photo"]
+    if old:
+        oldp = os.path.join(BASE, old.split("?")[0].lstrip("/"))
+        if os.path.exists(oldp):
+            try: os.remove(oldp)
+            except OSError: pass
+    q("UPDATE users SET avatar_photo='' WHERE id=?", (u["id"],))
+    commit()
+    return jsonify(ok=True)
+
 @app.post("/api/me/password")
 @require_user
 def me_password(u):
@@ -781,6 +837,20 @@ def me_password(u):
     return jsonify(ok=True)
 
 # ---------------------------------------------------------------- notifications
+@app.get("/api/people")
+def people():
+    me = current_user()
+    me_id = me["id"] if me else 0
+    rows = qa("""SELECT u.id, COUNT(DISTINCT v.id) recent FROM users u
+                 LEFT JOIN videos v ON v.user_id=u.id AND v.status='approved'
+                 WHERE u.id != ? GROUP BY u.id ORDER BY recent DESC, u.id DESC LIMIT 8""", (me_id,))
+    ids = [r["id"] for r in rows]
+    if not ids: return jsonify(people=[])
+    pub = users_pub_map(ids)
+    following = set(a for a, in qa("SELECT followee_id FROM follows WHERE follower_id=?", (me_id,))) if me_id else set()
+    out = [{**pub[i], "you_follow": i in following} for i in ids if i in pub]
+    return jsonify(people=out)
+
 @app.get("/api/notifications")
 @require_user
 def notifications(u):

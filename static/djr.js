@@ -403,9 +403,15 @@ function djUpdateOverlay() {
   const info = document.getElementById("djr-info");
   if (info) info.innerHTML = `
     <div class="djr-kicker">${kicker}</div>
-    <div class="djr-creator" data-nav="/user/${v.owner.username}">${avatar(v.owner, "sm")} <b>@${esc(v.owner.username)}</b></div>
+    <div class="djr-crow">
+      <div class="djr-creator" data-nav="/user/${v.owner.username}">${avatar(v.owner, "sm")} <b>@${esc(v.owner.username)}</b></div>
+      ${ME && ME.username !== v.owner.username ? `<button class="djr-follow" data-djfollow="${esc(v.owner.username)}">FOLLOW</button>` : ""}
+    </div>
     ${v.title ? `<div class="djr-title">${esc(v.title)}</div>` : ""}
     ${sub ? `<div class="djr-sub">${esc(sub)}</div>` : ""}`;
+  info.querySelectorAll("[data-djfollow]").forEach(b => b.addEventListener("click", () => {
+    if (typeof toggleFollow === "function") toggleFollow(b.dataset.djfollow, b);
+  }));
   const cn = document.getElementById("djr-c-n");
   if (cn) cn.textContent = v.comments || 0;
   const ra = document.getElementById("djr-rate-avg");
@@ -544,8 +550,17 @@ async function djOpenComments() {
     const d = await api(`/api/video/${v.id}`);
     body.innerHTML = d.comments.length ? d.comments.map(c => `
       <div class="c-row"><span class="avatar sm" style="background:var(--surface3);font-weight:800;font-size:12px">${esc((c.username[0] || "?").toUpperCase())}</span>
-      <div class="c-body"><b>@${esc(c.username)}</b><span class="t">${timeAgo(c.created_at)}</span><br>${esc(c.text)}</div></div>`).join("")
+      <div class="c-body"><b>@${esc(c.username)}</b><span class="t">${timeAgo(c.created_at)}</span><br>${esc(c.text)}</div>
+      <button class="c-like ${c.liked ? "on" : ""}" data-clike="${c.id}">${ic("heart", 13)}<em>${c.likes || ""}</em></button></div>`).join("")
       : `<div class="empty" style="padding:18px">No comments yet. Say something.</div>`;
+    body.querySelectorAll("[data-clike]").forEach(b => b.addEventListener("click", async () => {
+      if (!ME) { toast("Log in to like comments"); return; }
+      try {
+        const d2 = await api(`/api/comment/${b.dataset.clike}/like`, { method: "POST" });
+        b.classList.toggle("on", d2.liked);
+        b.querySelector("em").textContent = d2.likes || "";
+      } catch (err) { toast(err.message, true); }
+    }));
     v.comments = d.video.comments;
     const cn = document.getElementById("djr-c-n"); if (cn) cn.textContent = v.comments;
   } catch (e) { body.innerHTML = `<div class="empty">Could not load comments.</div>`; }

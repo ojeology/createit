@@ -76,6 +76,7 @@ function scoreBadge(score) {
 }
 
 function avatar(u, cls = "") {
+  if (u.avatar_photo) return `<span class="avatar ${cls} av-photo" style="border-color:${u.color}66"><img src="${u.avatar_photo}" alt=""></span>`;
   return `<span class="avatar ${cls}" style="background:${u.color}22;border-color:${u.color}55">${u.avatar}</span>`;
 }
 
@@ -664,6 +665,35 @@ function beatBoard(c) {
 }
 
 let HOME_DATA = null;
+async function toggleFollow(username, btn) {
+  if (!ME) { toast("Log in to follow creators"); setTimeout(() => location.hash = "/login", 400); return; }
+  try {
+    const d = await api(`/api/user/${username}/follow`, { method: "POST" });
+    if (btn) { btn.textContent = d.following ? "FOLLOWING ✓" : "FOLLOW"; btn.classList.toggle("on", d.following); }
+    toast(d.following ? `Following @${username}.` : `Unfollowed @${username}.`);
+  } catch (err) { toast(err.message, true); }
+}
+async function loadPeopleStrip() {
+  const wrap = document.getElementById("people-strip-wrap");
+  if (!wrap) return;
+  try {
+    const d = await api("/api/people");
+    const ppl = (d.people || []).filter(p => !p.you_follow).slice(0, 6);
+    if (!ppl.length) return;
+    wrap.innerHTML = `
+      ${secHead("", "user", "Creators to follow", "the people setting the pace right now")}
+      <div class="hscroll">${ppl.map(p => `
+        <div class="ppl-card">
+          <span data-nav="/user/${p.username}" style="cursor:pointer">${avatar(p, "md")}</span>
+          <div class="ppl-n" data-nav="/user/${p.username}">@${esc(p.username)}</div>
+          <div class="ppl-s">${p.followers} follower${p.followers === 1 ? "" : "s"}</div>
+          <button class="btn btn-sm ppl-follow ${p.you_follow ? "on" : ""}" data-pfollow="${esc(p.username)}">${p.you_follow ? "FOLLOWING ✓" : "FOLLOW"}</button>
+        </div>`).join("")}
+      </div>`;
+    wrap.querySelectorAll("[data-pfollow]").forEach(b => b.addEventListener("click", () => toggleFollow(b.dataset.pfollow, b)));
+  } catch (e) { /* silent */ }
+}
+
 function railSlide(v, i, mode) {
   const ov = mode === "rec" ? `
     <div class="cr-ov">
@@ -727,7 +757,7 @@ async function viewHome() {
   const d = await api("/api/home");
   HOME_DATA = d;
   const h = d.hero;
-  setTimeout(() => { ciRailInit("rail-rec", d.hero_success); ciRailInit("rail-beat", d.beat_feed); }, 0);
+  setTimeout(() => { ciRailInit("rail-rec", d.hero_success); ciRailInit("rail-beat", d.beat_feed); loadPeopleStrip(); }, 0);
   if (typeof regList === "function") {
     if (h) regList("home-hero", [h.original_video]);
     regList("home-feed", d.hero_feed || []);
@@ -782,6 +812,8 @@ async function viewHome() {
   <div class="cirail" id="rail-beat">
     <div class="cirail-track">${d.beat_feed.map((v, i) => railSlide(v, i, "beat")).join("")}</div>
   </div>` : ""}
+
+  <div id="people-strip-wrap"></div>
 
   ${secHead("", "crown", "Current champion", "")}
   ${h.champion ? `
@@ -1672,6 +1704,26 @@ async function viewSettings() {
       $$("#set-colors .set-color").forEach(x => x.classList.toggle("on", x === b));
       refreshPv();
     }));
+    $("#set-photo-btn")?.addEventListener("click", () => $("#set-photo").click());
+    $("#set-photo")?.addEventListener("change", async () => {
+      const f = $("#set-photo").files[0];
+      if (!f) return;
+      if (f.size > 8 * 1024 * 1024) { toast("Photo too large — keep it under 8MB.", true); return; }
+      const fd = new FormData(); fd.append("file", f);
+      try {
+        const r = await fetch("/api/me/avatar-photo", { method: "POST", body: fd, headers: authToken() ? { "X-CI-Token": authToken() } : {} });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Upload failed");
+        ME = { ...ME, ...d.me, avatar_photo: d.avatar_photo };
+        renderChrome(); refreshMe(); toast("Profile photo updated."); route();
+      } catch (err) { toast(err.message, true); }
+    });
+    $("#set-photo-rm")?.addEventListener("click", async () => {
+      try {
+        await api("/api/me/avatar-photo/remove", { method: "POST" });
+        ME = { ...ME, avatar_photo: "" }; renderChrome(); refreshMe(); toast("Photo removed — emoji restored."); route();
+      } catch (err) { toast(err.message, true); }
+    });
     $("#set-save-acct")?.addEventListener("click", async () => {
       try {
         const d = await api("/api/me/update", { method: "POST", json: {
@@ -1741,6 +1793,12 @@ async function viewSettings() {
     <div class="field"><label>EMAIL</label><input class="input" id="set-email" type="email" value="${esc(ME.email || "")}" placeholder="you@example.com"></div>
     <div class="field"><label>BIO</label><textarea class="input" id="set-bio" maxlength="160" placeholder="What makes you uniquely you?">${esc(ME.bio || "")}</textarea></div>
     <div class="field"><label>PROFILE PICTURE</label>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+        <input type="file" id="set-photo" accept="image/jpeg,image/png,image/webp" style="display:none">
+        <button class="btn btn-sm" id="set-photo-btn">${ic("upload", 13)} UPLOAD REAL PHOTO</button>
+        ${ME.avatar_photo ? `<button class="btn btn-sm" id="set-photo-rm">REMOVE PHOTO</button>` : ""}
+        <span class="set-note">Or pick a face below.</span>
+      </div>
       <div class="set-faces" id="set-faces">${(window.SET_FACES||["😎","🤩","😊","😄","😇","🙂","🤗","😜","🥳","🤓","😏","😌","🕺","💃","🧑‍🎤","👩‍🎤"]).map(f => `<button type="button" class="set-face ${f===ME.avatar?"on":""}" data-face="${f}">${f}</button>`).join("")}</div>
     </div>
     <div class="field"><label>RING COLOR</label>
@@ -2306,6 +2364,16 @@ function updateBackBtn(path) {
   bb.style.display = show ? "inline-flex" : "none";
   bb.classList.toggle("show", show);
 }
+function heroViewGate() {
+  const hv = $("#hero-video");
+  if (!hv || hv.dataset.gated) return;
+  hv.dataset.gated = "1";
+  new IntersectionObserver(es => es.forEach(en => {
+    if (en.isIntersecting) { if (hv.__shouldPlay !== false) hv.play().catch(() => {}); }
+    else { hv.__shouldPlay = false; hv.pause(); }
+  }), { threshold: 0.25 }).observe(hv);
+}
+
 function heroSoundArm() {
   const hv = $("#hero-video");
   if (!hv) return;
@@ -2385,7 +2453,7 @@ async function route() {
     }
     app.innerHTML = html;
     app.classList.remove("view-in"); void app.offsetWidth; app.classList.add("view-in");
-    const hv = $("#hero-video"); if (hv) { mountVid(hv); heroSoundArm(); }
+    const hv = $("#hero-video"); if (hv) { mountVid(hv); heroSoundArm(); heroViewGate(); }
     observeReveals();
     runCountUps();
     bindTilt();

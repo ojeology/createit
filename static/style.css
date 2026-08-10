@@ -2618,3 +2618,38 @@ body:has(#djr) #backbtn, body:has(.player) #backbtn{display:none !important}
   padding:12px 4px 2px}
 .record-now b{font-family:var(--display);font-weight:900;font-size:22px;color:var(--gold);letter-spacing:.02em}
 .record-now .ic{color:var(--gold)}
+
+/* ============================================================
+   v29 — scroll-friendly rails, photo avatars, social layer
+   ============================================================ */
+/* rails: allow vertical page scroll to pass through + slimmer height */
+.cirail{height:min(60vh,480px)}
+.cirail-track{touch-action:pan-x pan-y}
+
+/* photo avatars */
+.avatar.av-photo{padding:0;overflow:hidden;background:var(--paper3)}
+.avatar.av-photo img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* people to follow */
+.ppl-card{flex:0 0 auto;width:150px;display:flex;flex-direction:column;align-items:center;gap:7px;
+  background:var(--paper2);border-radius:16px;padding:16px 12px;box-shadow:0 4px 16px rgba(0,0,0,.1)}
+[data-theme="dark"] .ppl-card{background:#121419}
+.ppl-n{font-weight:700;font-size:13px;cursor:pointer}
+.ppl-s{font-size:11px;color:var(--dim)}
+.ppl-follow{margin-top:4px}
+.ppl-follow.on{background:rgba(31,122,92,.15);color:var(--green);border-color:rgba(31,122,92,.4)}
+
+/* discovery follow chip */
+.djr-crow{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.djr-follow{pointer-events:auto;font-family:var(--mono);font-size:9px;letter-spacing:.2em;padding:7px 13px;border-radius:999px;
+  background:rgba(225,78,42,.9);border:none;color:#fff;cursor:pointer;transition:transform .12s ease, background .2s ease}
+.djr-follow:active{transform:scale(.92)}
+.djr-follow.on{background:rgba(31,122,92,.9)}
+
+/* comment likes */
+.c-row{display:flex;gap:10px;align-items:flex-start}
+.c-like{flex:none;display:flex;align-items:center;gap:4px;background:none;border:none;color:var(--dim);cursor:pointer;
+  font-family:var(--mono);font-size:10px;padding:6px 4px;transition:transform .12s ease}
+.c-like em{font-style:normal}
+.c-like:active{transform:scale(1.2)}
+.c-like.on{color:var(--red)}
