@@ -81,7 +81,7 @@ def notify(user_id, kind, text, link=""):
     q("INSERT INTO notifications (user_id, kind, text, link, read, created_at) VALUES (?,?,?,?,0,?)",
       (user_id, kind, text, link, now_iso()))
 
-STAGES = ["create_it", "recreate_it", "recreate_closed", "beat_it", "champion"]
+STAGES = ["create_it", "recreate_it", "recreate_closed", "beat_it", "judging", "champion", "archived"]
 
 # ---------------------------------------------------------------- schema + seed
 SCHEMA = """
@@ -198,6 +198,9 @@ def seed_if_empty():
     if not q1("SELECT 1 FROM challenges WHERE sponsor IS NOT NULL AND sponsor != ''"):
         q("UPDATE challenges SET sponsor='INDOMIE' WHERE id=3")
     for stmt in ("ALTER TABLE videos ADD COLUMN views INTEGER DEFAULT 0",
+                 "ALTER TABLE videos ADD COLUMN reject_reason TEXT DEFAULT ''",
+                 "ALTER TABLE videos ADD COLUMN eval_status TEXT DEFAULT 'pending'",
+                 "ALTER TABLE videos ADD COLUMN evaluated_at TEXT",
                  "ALTER TABLE users ADD COLUMN youtube TEXT DEFAULT ''",
                  "ALTER TABLE users ADD COLUMN tiktok TEXT DEFAULT ''",
                  "ALTER TABLE users ADD COLUMN instagram TEXT DEFAULT ''"):
@@ -370,6 +373,7 @@ def videos_pub(rows, me=None):
             "src": "/uploads/" + r["file"], "poster": _poster_for(r["file"]), "status": r["status"], "score": r["score"],
             "views": (r["views"] or 0) if "views" in r.keys() else 0,
             "attempt_no": r["attempt_no"], "nominated": bool(r["nominated"]), "created_at": r["created_at"],
+        "eval_status": (r["eval_status"] if "eval_status" in r.keys() else "pending") if r["kind"] in ("recreate", "beatit") else None,
             "owner": owners.get(r["user_id"]),
             "challenge": chs.get(r["challenge_id"]),
             "likes": like_c.get(r["id"], 0), "liked": r["id"] in liked, "comments": com_c.get(r["id"], 0),
@@ -771,14 +775,14 @@ def upload(u):
             notify(ch["creator_id"], "beatit", f"@{u['username']} submitted a Beat It final on {ch['code']}. Your benchmark is under attack.", f"/challenge/{cid}")
         commit()
         return jsonify(ok=True, video_id=vid, message="Final submission locked in. One shot. Make it count.")
-    # creation / self-nomination — goes live in Discover immediately; scouts review it for challenge selection
+    # creation / self-nomination — enters REVIEW; admin approval required before it goes live
     nominated = 1 if request.form.get("nominated") else 0
-    q("INSERT INTO videos (user_id, kind, title, description, file, status, nominated, created_at) VALUES (?,?,?,?,?,'approved',?,?)",
+    q("INSERT INTO videos (user_id, kind, title, description, file, status, nominated, created_at) VALUES (?,?,?,?,?,'pending',?,?)",
       (u["id"], "creation", title or "Untitled creation", desc, fname, nominated, now_iso()))
     vid = q1("SELECT last_insert_rowid() id")["id"]
-    notify(u["id"], "review", f"“{title or 'Your creation'}” is live in Discover. CreateIt scouts are watching.", "/discover")
+    notify(u["id"], "review", f"“{title or 'Your creation'}” entered CreateIt review. You'll be notified the moment it's approved.", "/notifications")
     commit()
-    return jsonify(ok=True, video_id=vid, message="Your creation is live in Discover — CreateIt scouts are watching.")
+    return jsonify(ok=True, video_id=vid, message="Submitted for CreateIt review — approval required before it goes live.")
 
 # ---------------------------------------------------------------- discovery architecture
 @app.get("/api/categories")
@@ -980,8 +984,9 @@ def admin_review(u):
     if not r or r["status"] != "pending": return jsonify(error="Not a pending submission"), 404
     action = d.get("action")
     if action == "reject":
-        q("UPDATE videos SET status='rejected' WHERE id=?", (r["id"],))
-        notify(r["user_id"], "review", f"Your submission “{r['title']}” was not selected this time. Keep creating — the next one might be it.", "/notifications")
+        reason = (d.get("reason") or "").strip()[:300]
+        q("UPDATE videos SET status='rejected', reject_reason=? WHERE id=?", (reason, r["id"]))
+        notify(r["user_id"], "review", f"Your submission “{r['title']}” was not selected this time." + (f" Reason: {reason}" if reason else " Keep creating — the next one might be it."), "/notifications")
         commit(); return jsonify(ok=True)
     if action != "approve": return jsonify(error="Bad action"), 400
     if d.get("make_challenge"):
@@ -990,7 +995,9 @@ def admin_review(u):
           (code, d.get("title") or r["title"], d.get("description") or r["description"] or "Recreate this creation.",
            r["user_id"], r["id"], int(d.get("target") or 100), int(d.get("featured") or 0), now_iso(), now_iso(14)))
         cid = q1("SELECT last_insert_rowid() id")["id"]
-        q("UPDATE videos SET status='approved', challenge_id=? WHERE id=?", (cid, r["id"]))
+        q("UPDATE videos SET status='live', challenge_id=?, eval_status='evaluated', evaluated_at=? WHERE id=?", (cid, now_iso(), r["id"]))
+        if d.get("category_id"):
+            q("INSERT OR IGNORE INTO challenge_categories (challenge_id, category_id) VALUES (?,?)", (cid, int(d["category_id"])))
         notify(r["user_id"], "challenge", f"“{r['title']}” was selected! It is now {code} — you are the benchmark everyone must chase.", f"/challenge/{cid}")
     else:
         q("UPDATE videos SET status='approved' WHERE id=?", (r["id"],))
@@ -1004,11 +1011,13 @@ def admin_score(u):
     d = request.get_json(silent=True) or {}
     r = get_video(d.get("video_id", 0))
     if not r: return jsonify(error="Not found"), 404
+    if r["kind"] not in ("recreate", "beatit"):
+        return jsonify(error="Only recreate and Beat It submissions can be evaluated."), 400
     try: score = float(d.get("score"))
     except (TypeError, ValueError): return jsonify(error="Bad score"), 400
     if not (0 <= score <= 120): return jsonify(error="Score must be 0–120"), 400
     prev = r["score"]
-    q("UPDATE videos SET score=? WHERE id=?", (score, r["id"]))
+    q("UPDATE videos SET score=?, eval_status='evaluated', evaluated_at=? WHERE id=?", (score, now_iso(), r["id"]))
     if r["kind"] == "recreate" and r["challenge_id"]:
         ch = get_challenge(r["challenge_id"])
         if (prev is None or prev < 100) and score >= 100:
@@ -1042,6 +1051,9 @@ def admin_stage(u):
     if stage == "beat_it":
         for row in qa("SELECT DISTINCT user_id FROM videos WHERE challenge_id=? AND kind='recreate' AND score>=100", (ch["id"],)):
             notify(row["user_id"], "stage", f"{ch['code']} entered BEAT IT. You are qualified — ONE FINAL SUBMISSION.", f"/challenge/{ch['id']}")
+    if stage == "judging":
+        for row in qa("SELECT DISTINCT user_id FROM videos WHERE challenge_id=? AND kind='beatit'", (ch["id"],)):
+            notify(row["user_id"], "stage", f"{ch['code']} is now in JUDGING. The champion will be crowned soon.", f"/challenge/{ch['id']}")
     if stage == "champion" and not ch["champion_id"]:
         pass  # champion must be crowned via /api/admin/crown
     commit()
@@ -1068,6 +1080,8 @@ def admin_crown(u):
     if not ch or not r or r["kind"] != "beatit" or r["challenge_id"] != ch["id"]:
         return jsonify(error="Invalid beat-it submission"), 400
     if r["score"] is None: return jsonify(error="Score this submission first"), 400
+    if ch["stage"] not in ("beat_it", "judging", "champion"):
+        return jsonify(error="A champion can only be crowned after Beat It."), 400
     prev = q1("SELECT champion_id, champion_video_id, champion_score, champion_at FROM challenges WHERE id=?", (ch["id"],))
     if prev and prev["champion_id"]:
         q("INSERT INTO champions_history (challenge_id, user_id, video_id, score, achieved_at, superseded_at) VALUES (?,?,?,?,?,?)",
@@ -1093,6 +1107,19 @@ def admin_sponsor(u):
     q("UPDATE challenges SET sponsor=? WHERE id=?", (sponsor, ch["id"]))
     commit()
     return jsonify(ok=True, sponsor=sponsor)
+
+@app.get("/api/admin/dashboard")
+@require_admin
+def admin_dashboard(u):
+    return jsonify(
+        pending_creations=q1("SELECT COUNT(*) c FROM videos WHERE status='pending' AND kind='creation'")["c"],
+        active_challenges=q1("SELECT COUNT(*) c FROM challenges WHERE stage IN ('recreate_it','recreate_closed','beat_it','judging')")["c"],
+        awaiting_eval=q1("SELECT COUNT(*) c FROM videos WHERE kind IN ('recreate','beatit') AND eval_status='pending' AND status='approved'")["c"],
+        successful_recreations=q1("SELECT COUNT(*) c FROM videos WHERE kind='recreate' AND score>=100")["c"],
+        beatit_submissions=q1("SELECT COUNT(*) c FROM videos WHERE kind='beatit'")["c"],
+        awaiting_judging=q1("SELECT COUNT(*) c FROM challenges WHERE stage='judging'")["c"],
+        champions=q1("SELECT COUNT(*) c FROM challenges WHERE stage='champion'")["c"],
+        users=q1("SELECT COUNT(*) c FROM users")["c"])
 
 @app.get("/api/admin/challenges")
 @require_admin

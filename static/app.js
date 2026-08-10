@@ -52,11 +52,13 @@ function timeAgo(iso) {
 }
 
 const STAGE_META = {
-  create_it:       { label: "CREATE IT",       icon: "🎬" },
+  create_it:       { label: "IN REVIEW",       icon: "🎬" },
   recreate_it:     { label: "RECREATE IT",     icon: "🔄" },
   recreate_closed: { label: "RECREATE CLOSED", icon: "🔒" },
   beat_it:         { label: "BEAT IT",         icon: "⚔️" },
+  judging:         { label: "JUDGING",         icon: "⚖️" },
   champion:        { label: "CHAMPION",        icon: "👑" },
+  archived:        { label: "ARCHIVED",        icon: "🗂️" },
 };
 const stagePill = st => `<span class="pill st-${st}"><span class="pd"></span>${STAGE_META[st].label}</span>`;
 
@@ -833,7 +835,7 @@ async function viewArenaBeatit() {
 function stageTrack(stage) {
   const steps = [
     ["create_it", "CREATE IT", "film"], ["recreate_it", "RECREATE IT", "refresh"], ["recreate_closed", "CLOSED", "lock"],
-    ["beat_it", "BEAT IT", "zap"], ["champion", "CHAMPION", "crown"], ["record", "RECORD", "disc"],
+    ["beat_it", "BEAT IT", "zap"], ["judging", "JUDGING", "eye"], ["champion", "CHAMPION", "crown"], ["record", "RECORD", "disc"],
   ];
   const idx = stage === "champion" ? 4 : steps.findIndex(s => s[0] === stage);
   return `<div class="stage-track">${steps.map((s, i) => {
@@ -891,6 +893,7 @@ async function viewChallenge(id) {
     </div>
   </div>
   ${stageTrack(c.stage)}
+  ${statusBanner(c)}
   ${champ ? `
   <div class="champ-plate">
     <span class="cp-crown">${ic("crown", 48)}</span>
@@ -1665,18 +1668,25 @@ function viewAuth(mode, note) {
 // ---------------- admin ----------------
 async function viewAdmin() {
   if (!ME?.is_admin) return `<div class="empty">${ic("shield",16)} Admins only.</div>`;
-  const [q1d, chd, ud] = await Promise.all([api("/api/admin/queue"), api("/api/admin/challenges"), api("/api/admin/users")]);
-  const stages = ["create_it", "recreate_it", "recreate_closed", "beat_it", "champion"];
+  const [q1d, chd, ud, dbd, catd] = await Promise.all([api("/api/admin/queue"), api("/api/admin/challenges"), api("/api/admin/users"), api("/api/admin/dashboard"), api("/api/categories")]);
+  const stages = ["create_it", "recreate_it", "recreate_closed", "beat_it", "judging", "champion", "archived"];
+  const cats = catd.categories || [];
   setTimeout(() => {
     // review actions
     $$("[data-review]").forEach(b => b.onclick = async () => {
       const id = b.dataset.review, act = b.dataset.reviewAct;
       const payload = { video_id: +id, action: act };
+      if (act === "reject") {
+        const reason = prompt("Rejection reason (optional — the creator will see this):");
+        if (reason === null) return;
+        payload.reason = reason;
+      }
       if (act === "approve" && b.dataset.challenge === "1") {
         payload.make_challenge = true;
         payload.title = $(`#ch-title-${id}`).value;
         payload.target = $(`#ch-target-${id}`).value;
         payload.featured = $(`#ch-featured-${id}`).checked ? 1 : 0;
+        payload.category_id = $(`#ch-cat-${id}`)?.value || "";
       }
       try { await api("/api/admin/review", { method: "POST", json: payload }); toast(act === "reject" ? "Submission rejected." : "Approved."); route(); refreshMe().then(renderChrome); }
       catch (e) { toast(e.message, true); }
@@ -1702,6 +1712,9 @@ async function viewAdmin() {
     $$("[data-feature]").forEach(b => b.onclick = async () => {
       try { await api("/api/admin/featured", { method: "POST", json: { challenge_id: +b.dataset.feature } }); toast("Now the Creator of the Week feature."); route(); } catch (e) { toast(e.message, true); }
     });
+    $$("[data-quickstage]").forEach(b => b.onclick = async () => {
+      try { await api("/api/admin/stage", { method: "POST", json: { challenge_id: +b.dataset.quickstage, stage: b.dataset.qs } }); toast(b.dataset.qs === "judging" ? "Moved to judging — finalists notified." : "Challenge archived."); route(); } catch (e) { toast(e.message, true); }
+    });
     $$("[data-closes]").forEach(b => b.onclick = async () => {
       const val = $(`#closes-${b.dataset.closes}`).value;
       if (!val) return toast("Pick a date first.", true);
@@ -1718,7 +1731,16 @@ async function viewAdmin() {
 
   return `
   <div class="page-head"><span class="crumb">CONTROL ROOM</span><h1 class="big-title">ADMIN</h1>
-  <div class="meta-row">V1 relies on human evaluation. You are the judge, scout and historian.</div></div>
+  <div class="meta-row">The competition engine runs on human judgment. You are the judge, scout and historian.</div></div>
+  <div class="adm-deck">
+    <div class="adm-kpi"><b>${dbd.pending_creations}</b><span>PENDING CREATIONS</span></div>
+    <div class="adm-kpi"><b>${dbd.active_challenges}</b><span>ACTIVE CHALLENGES</span></div>
+    <div class="adm-kpi"><b>${dbd.awaiting_eval}</b><span>AWAITING EVALUATION</span></div>
+    <div class="adm-kpi"><b>${dbd.successful_recreations}</b><span>SUCCESSFUL RECREATIONS</span></div>
+    <div class="adm-kpi"><b>${dbd.beatit_submissions}</b><span>BEAT IT SUBMISSIONS</span></div>
+    <div class="adm-kpi"><b>${dbd.awaiting_judging}</b><span>IN JUDGING</span></div>
+    <div class="adm-kpi"><b>${dbd.champions}</b><span>CHAMPIONS</span></div>
+  </div>
   <div class="adm-stats">
     <div class="stat-box"><div class="v">${q1d.stats.users}</div><div class="k">Users</div></div>
     <div class="stat-box"><div class="v">${q1d.stats.videos}</div><div class="k">Videos</div></div>
@@ -1741,6 +1763,7 @@ async function viewAdmin() {
       <div id="mkch-${v.id}" style="display:none;width:100%;border-top:1px dashed var(--line2);padding-top:10px;margin-top:4px">
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <input class="input" id="ch-title-${v.id}" value="${esc(v.title)}" style="flex:2;min-width:160px">
+          <select class="input" id="ch-cat-${v.id}" style="width:150px"><option value="">No category</option>${cats.map(c => `<option value="${c.id}">${esc(c.parent ? c.parent + " · " : "")}${esc(c.name)}</option>`).join("")}</select>
           <input class="input" id="ch-target-${v.id}" type="number" value="100" min="1" style="width:110px" title="Recreate target">
           <label style="font-size:12px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="ch-featured-${v.id}"> Feature as Creator of the Week</label>
           <button class="btn btn-sm btn-fire" data-review="${v.id}" data-review-act="approve" data-challenge="1">CREATE THE CHALLENGE</button>
@@ -1782,6 +1805,8 @@ async function viewAdmin() {
         ${c.sponsor ? `<span class="pill-mini pm-gold">${esc(c.sponsor)} × CREATEIT is live</span>` : ""}
         <input type="date" class="score-input" id="closes-${c.id}" value="${(c.closes_at || "").slice(0, 10)}" style="width:150px">
         <button class="mini-btn" data-closes="${c.id}">${ic("clock", 12)} SET DEADLINE</button>
+        ${c.stage === "beat_it" ? `<button class="mini-btn" data-quickstage="${c.id}" data-qs="judging">${ic("eye", 12)} MOVE TO JUDGING</button>` : ""}
+        ${c.stage !== "archived" ? `<button class="mini-btn" data-quickstage="${c.id}" data-qs="archived">ARCHIVE</button>` : ""}
       </div>
       ${c.stage === "beat_it" && c.beatits.length ? `<div style="width:100%;display:flex;gap:8px;flex-wrap:wrap;border-top:1px dashed var(--line2);padding-top:9px">
         ${c.beatits.map(b => `<span class="chip" style="cursor:default">@${esc(b.owner.username)} · ${b.score != null ? b.score + "%" : "unscored"}
@@ -1862,6 +1887,30 @@ document.addEventListener("pointerup", e => {
   if (!ME) { toast("Log in to rate creations"); setTimeout(() => location.hash = "/login", 400); rateEl.classList.remove("open"); return; }
   commitRate(rateEl, gaugeValFromY(g, e.clientY));
 });
+
+// ---------------- lifecycle status banner ----------------
+function statusBanner(c) {
+  const m = c.mine;
+  let label, sub, tone = "lock";
+  if (c.stage === "recreate_it") {
+    if (m && m.qualified) { label = "RECREATE COMPLETE ✓"; sub = "You passed. Beat It opens when the recreate stage closes."; tone = "ok"; }
+    else if (m && m.attempts > 0) { label = `ATTEMPTS LOGGED · BEST ${m.best != null ? m.best + "%" : "—"}`; sub = "Every attempt is saved. Reach 100% to complete the recreate."; tone = "go"; }
+    else { label = "RECREATE IT OPEN"; sub = "Watch the original. Submit your first attempt."; tone = "go"; }
+  } else if (c.stage === "recreate_closed" || c.stage === "beat_it") {
+    if (m && m.beatit_submitted) { label = "BEAT IT SUBMITTED ✓"; sub = "Your final submission is in. Judging decides the champion."; tone = "ok"; }
+    else if (m && m.qualified) { label = "YOU ARE ELIGIBLE — ONE FINAL SUBMISSION"; sub = "Beat It is open. One shot. No retakes."; tone = "fire"; }
+    else { label = "BEAT IT — QUALIFIED ONLY"; sub = "Reach 100% in Recreate It to enter the final."; tone = "lock"; }
+  } else if (c.stage === "judging") {
+    label = "JUDGING IN PROGRESS"; sub = "CreateIt is evaluating the final submissions. The champion comes next."; tone = "lock";
+  } else if (c.stage === "champion") {
+    label = "COMPLETED — CHAMPION CROWNED"; sub = "The record is set. Records exist to be broken."; tone = "gold";
+  } else if (c.stage === "archived") {
+    label = "ARCHIVED"; sub = "This challenge has left the Arena."; tone = "lock";
+  } else {
+    label = "IN REVIEW"; sub = "CreateIt is reviewing this creation."; tone = "lock";
+  }
+  return `<div class="status-banner sb-${tone}"><div class="sb-l">${label}</div><div class="sb-s">${sub}</div></div>`;
+}
 
 // ---------------- signature moments ----------------
 const MOMENTS = new Set();

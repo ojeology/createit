@@ -2107,3 +2107,28 @@ body::before,body::after{display:none}
 .hr-mid{flex:1;min-width:0;display:flex;flex-direction:column}
 .hr-mid b{font-size:13.5px}
 .hr-mid .hr-d{font-family:var(--mono);font-size:9.5px;color:var(--dim);letter-spacing:.06em}
+
+/* ============================================================
+   v18 — COMPETITION ENGINE: status banners, judging, admin KPIs
+   ============================================================ */
+/* judging + archived pills */
+.st-judging{color:#8fb8d8}.st-judging .pd{background:#8fb8d8}
+.st-archived{color:var(--dim)}.st-archived .pd{background:var(--dim)}
+
+/* lifecycle status banner */
+.status-banner{display:flex;flex-direction:column;gap:4px;border:1px solid var(--line2);border-left-width:4px;border-radius:4px;
+  padding:14px 18px;margin:14px 0;background:var(--paper3)}
+.sb-l{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.2em}
+.sb-s{font-size:13px;color:var(--ink3)}
+.sb-go{border-left-color:var(--red)}.sb-go .sb-l{color:var(--red)}
+.sb-ok{border-left-color:var(--green)}.sb-ok .sb-l{color:var(--green)}
+.sb-fire{border-left-color:var(--red);background:rgba(217,51,31,.05)}.sb-fire .sb-l{color:var(--red)}
+.sb-gold{border-left-color:var(--gold)}.sb-gold .sb-l{color:var(--gold)}
+.sb-lock{border-left-color:var(--dim)}.sb-lock .sb-l{color:var(--ink3)}
+
+/* admin KPI deck */
+.adm-deck{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px;margin-bottom:18px}
+.adm-kpi{border:1px solid var(--line);border-radius:4px;background:var(--paper3);padding:14px 14px 12px;display:flex;flex-direction:column;gap:5px}
+.adm-kpi b{font-family:var(--display);font-weight:900;font-size:28px;line-height:1;color:var(--ink)}
+.adm-kpi span{font-family:var(--mono);font-size:8px;letter-spacing:.18em;color:var(--dim)}
+.adm-kpi:first-child b{color:var(--red)}
