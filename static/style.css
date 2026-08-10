@@ -1344,3 +1344,154 @@ body::after{opacity:.7}
 /* moment + records */
 .moment-card{border-radius:24px}
 .records-card .rc-title{font-size:18px;letter-spacing:1px}
+
+/* ============================================================
+   v13 — WORDMARK V2, HANG-PROOF SPLASH, OVERLAP FIXES, TASTE
+   ============================================================ */
+html,body{overflow-x:clip}
+
+/* ---- WORDMARK V2: CREATE + gradient IT chip ---- */
+.wm{display:inline-flex;align-items:baseline;font-family:var(--display);letter-spacing:.045em;line-height:1}
+.wm-create{display:inline-block;background:none;color:#f2f3f5;-webkit-background-clip:border-box;background-clip:border-box;
+  -webkit-text-fill-color:#f2f3f5;-webkit-mask-image:none;mask-image:none}
+.wm-it{display:inline-block;background:var(--grad-fire);color:#171008;-webkit-background-clip:border-box;background-clip:border-box;
+  -webkit-text-fill-color:#171008;padding:.05em .17em .07em;border-radius:.14em;margin-left:.16em;transform:none;
+  box-shadow:0 2px 12px rgba(225,78,42,.32), inset 0 1px 0 rgba(255,255,255,.28)}
+.brand .wm{font-size:21px}
+#railnav .brand .wm{font-size:23px}
+.auth-brand .wm{font-size:38px}
+
+/* ---- SPLASH V2: fast, simple, CSS-guaranteed exit ---- */
+#splash{animation:splash-autohide .45s ease 1.75s forwards}
+@keyframes splash-autohide{to{opacity:0;visibility:hidden}}
+#splash.sp-exit{animation:sp-out .4s cubic-bezier(.6,0,.8,.4) forwards}
+#splash .sp-word{display:none}
+.sp-word2{display:inline-flex;align-items:baseline;gap:.16em;font-family:var(--display);font-size:clamp(44px,9.5vw,88px);letter-spacing:.04em;line-height:1}
+.sp-b1{color:#f4f5f7;animation:sp-block1 .5s cubic-bezier(.2,1.15,.35,1) .32s both}
+.sp-b2{background:var(--grad-fire);color:#171008;padding:.05em .17em .07em;border-radius:.13em;
+  box-shadow:0 6px 30px rgba(225,78,42,.4), inset 0 1px 0 rgba(255,255,255,.28);
+  animation:sp-block2 .5s cubic-bezier(.2,1.15,.35,1) .44s both}
+@keyframes sp-block1{from{opacity:0;transform:translateX(-36px) skewX(-5deg);filter:blur(7px)}to{opacity:1;transform:none;filter:none}}
+@keyframes sp-block2{from{opacity:0;transform:translateX(32px) scale(.82);filter:blur(7px)}to{opacity:1;transform:none;filter:none}}
+#splash .sp-parts{inset:-30px -90px}
+.sp-part{animation-duration:.5s}
+#splash .sp-logo{width:88px;height:88px;margin-bottom:18px}
+#splash .sp-rule{display:none}
+#splash .sp-tag{animation:sp-fade .4s ease .8s both;margin-top:16px}
+
+/* ---- HERO: no overlaps on mobile ---- */
+.hero-info{gap:10px}
+.hi-kicker{gap:8px}
+@media (max-width:640px){
+  .hero-info{left:12px;right:12px;bottom:12px;gap:7px}
+  .hi-title{font-size:clamp(23px,7.2vw,34px);letter-spacing:1.2px}
+  .hi-sub{gap:8px;font-size:12px;flex-wrap:nowrap;overflow:hidden}
+  .hi-sub .ds-owner{max-width:56vw;overflow:hidden;white-space:nowrap}
+  .hi-sub .ds-owner b{overflow:hidden;text-overflow:ellipsis}
+  .hi-livechip{display:none}
+  .event-badge{font-size:8px;letter-spacing:2px;padding:6px 10px}
+  .event-stats{display:grid;grid-template-columns:1fr 1fr}
+  .ev-stat{border-right:none;border-bottom:1px solid var(--line);padding:13px 10px}
+  .ev-stat:nth-child(even){border-left:1px solid var(--line)}
+  .ev-stat:nth-last-child(-n+2){border-bottom:none}
+  .ev-stat .v{font-size:20px}
+  .event-cta{padding:2px 14px 16px;gap:8px}
+  .event-cta .btn{flex:1;min-width:0}
+  .hero-feed{margin-top:14px}
+  .feed-card{width:118px}
+}
+
+/* ---- PLAYER: clean zones, no overlaps ---- */
+.p-full .p-close{top:14px;right:14px}
+.p-top-ctx{top:14px;left:14px;right:auto;max-width:min(78vw,420px)}
+.p-ctx{left:14px;bottom:18px;right:86px;gap:8px}
+.p-rail{right:12px;bottom:auto;top:50%;transform:translateY(-50%);flex-direction:column}
+.pc-acts .btn{font-size:10.5px;padding:8px 11px}
+@media (max-width:640px){
+  .p-ctx{right:76px;bottom:16px}
+  .p-rail{right:10px;gap:10px}
+  .rail-act{width:46px;height:50px}
+  .p-top-ctx{max-width:70vw}
+  .ptc-line2{font-size:14px}
+}
+
+/* ---- DISCOVER: clean zones ---- */
+.disc-rail{right:12px;bottom:auto;top:50%;transform:translateY(-50%);flex-direction:column;gap:11px}
+.disc-ctx{left:14px;right:82px;bottom:20px;gap:8px}
+.ds-owner{max-width:100%;overflow:hidden}
+.ds-owner b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ds-act{gap:7px}
+.ds-act .btn{font-size:10.5px;padding:8px 11px}
+@media (max-width:640px){
+  .disc-ctx{right:72px;bottom:18px}
+  .disc-rail{right:9px;gap:9px}
+  .rail-act{width:45px;height:49px}
+  .ds-follow{width:45px;height:42px}
+  .disc-top{padding:9px 10px 7px;gap:7px}
+  .dt-search{padding:8px 13px}
+  .dt-search input{font-size:16px}
+}
+
+/* ---- feed cards: no meta overflow ---- */
+.fc-meta{gap:5px;padding:0 2px}
+.fc-meta span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fc-meta em{flex:none}
+
+/* ---- arena card stats: no overflow ---- */
+.ars-v{font-size:15px}
+.bb-stat .v{font-size:16px}
+.ar-creator{font-size:12px}
+.ar-creator b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:34vw}
+
+/* ---- taste: quieter chrome ---- */
+.sec{margin:54px 0 18px}
+.sec h2{font-size:21px;letter-spacing:2px}
+.grid3{gap:13px}
+.hscroll{gap:13px}
+.v-card,.ch-card,.arena-card,.records-card{border-radius:18px}
+.board-row{border-radius:14px}
+.up-row{border-radius:14px}
+.journey{border-radius:18px}
+.stage-tabs{gap:9px}
+.st-tab{border-radius:14px}
+.chip{padding:7px 13px}
+.dot-badge{box-shadow:0 2px 8px rgba(225,78,42,.4)}
+.week-ribbon{display:none}
+.card-glare{opacity:.7}
+
+/* arena head balance */
+@media (max-width:640px){
+  .arena-head{flex-direction:row;padding:22px 18px;gap:16px}
+  .arena-emblem{width:70px;height:70px}
+  .arena-head h1{font-size:34px;letter-spacing:2px}
+  .ah-stats{gap:18px;margin-top:12px}
+  .ah-stat .hv{font-size:19px}
+}
+
+/* champion plate mobile */
+@media (max-width:640px){
+  .champ-plate{padding:16px;gap:13px}
+  .champ-plate .cp-crown{width:42px;height:42px}
+  .cp-name{font-size:20px}
+}
+
+/* fight card mobile */
+@media (max-width:640px){
+  .fight-card{padding:16px 12px;gap:8px}
+  .fc-side .avatar{width:60px;height:60px;font-size:28px;border-radius:18px}
+  .fc-name{font-size:15px}
+  .fc-vs{font-size:28px}
+}
+
+/* profile mobile */
+@media (max-width:640px){
+  .prof-head{gap:14px}
+  .avatar.lg{width:66px;height:66px;font-size:32px;border-radius:19px}
+  .prof-id h1{font-size:25px}
+  .stat-strip{grid-template-columns:repeat(2,1fr);gap:9px}
+  .stat-box{padding:12px}
+  .stat-box .v{font-size:23px}
+}
+
+/* toast above nav */
+#toast-root{bottom:100px}

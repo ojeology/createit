@@ -184,7 +184,7 @@ function ic(name, size = 16, cls = "") {
   };
   s.addEventListener("click", dismiss);
   const fast = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  setTimeout(dismiss, fast ? 250 : 1450);
+  setTimeout(dismiss, fast ? 250 : 1250);
 })();
 
 // ---------------- scroll reveals + count-ups ----------------
