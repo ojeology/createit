@@ -176,7 +176,7 @@ function ic(name, size = 16, cls = "") {
 }
 
 // ---------------- theme: dark / light / system ----------------
-function themePref() { try { return localStorage.getItem("ci-theme") || "system"; } catch (e) { return "system"; } }
+function themePref() { try { return localStorage.getItem("ci-theme") || "dark"; } catch (e) { return "dark"; } }
 function resolveTheme(pref) {
   if (pref === "system") return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   return pref;
@@ -257,7 +257,7 @@ function renderChrome() {
   ];
   const route = location.hash.slice(1).split("?")[0] || "/";
   $("#bottomnav").innerHTML = items.map(it => it.special
-    ? `<button class="bn-create" data-nav="${it.path}" title="Create">${ic("plus", 24)}</button>`
+    ? `<button class="bn-create" data-act="create-sheet" title="Create">${ic("plus", 24)}</button>`
     : `<button class="bn-item ${route === it.path || (it.path !== "/" && route.startsWith(it.path)) ? "active" : ""}" data-nav="${it.path}"><span class="ico">${ic(it.ico, 20)}</span>${it.label}</button>`
   ).join("");
 
@@ -271,7 +271,7 @@ function renderChrome() {
     <span class="tagline">Create It · Recreate It · Beat It</span>
     <button class="rail-item ${route === "/" ? "active" : ""}" data-nav="/"><span class="ico">${ic("home", 18)}</span>Home</button>
     <button class="rail-item ${route.startsWith("/challenges") ? "active" : ""}" data-nav="/challenges"><span class="ico">${ic("flame", 18)}</span>Arena</button>
-    <button class="rail-item rail-create" data-nav="/create"><span class="ico">${ic("plus", 18)}</span>Create</button>
+    <button class="rail-item rail-create" data-act="create-sheet"><span class="ico">${ic("plus", 18)}</span>Create</button>
     <button class="rail-item ${route.startsWith("/discover") ? "active" : ""}" data-nav="/discover"><span class="ico">${ic("eye", 18)}</span>Discover</button>
     <button class="rail-item ${route.startsWith("/attempts") ? "active" : ""}" data-nav="/attempts"><span class="ico">${ic("target", 18)}</span>Attempts</button>
     <button class="rail-item ${route.startsWith("/leaderboard") ? "active" : ""}" data-nav="/leaderboard"><span class="ico">${ic("trophy", 18)}</span>Ranks</button>
@@ -282,6 +282,7 @@ function renderChrome() {
 
 document.addEventListener("click", e => {
   if (!e.target.closest(".rate")) $$(".rate.open").forEach(r => r.classList.remove("open"));
+  if (e.target.closest("[data-act='create-sheet']")) { openCreateSheet(); return; }
   // data-act (play video, like…) always wins over an ancestor data-nav
   if (e.target.closest("[data-act]")) return;
   const navEl = e.target.closest("[data-nav]");
@@ -609,66 +610,47 @@ async function viewHome() {
   ${tickerHTML(d)}
 
   ${h ? `
-  ${secHead("01", "crown", "CREATEIT OF THE WEEK", "the benchmark the world is chasing")}
-  <div class="event-frame"><div class="event-inner">
-    <div class="vid-frame hero-vid">
+  ${h ? `
+  <div class="hero-stage">
+    <div class="hero-media vid-frame">
       <video id="hero-video" src="${h.original_video.src}" poster="${h.original_video.poster || ""}" autoplay muted loop playsinline preload="auto"></video>
       <div class="hero-grad"></div>
+      <div class="hero-top">
+        <span class="hero-flag">${ic("crown", 12)} CREATEIT OF THE WEEK · ${esc(h.code)}</span>
+        ${stagePill(h.stage)}
+      </div>
       <div class="hero-info">
-        <div class="hi-kicker">
-          <span class="event-badge">${ic("crown", 12)} OFFICIAL CHALLENGE · ${esc(h.code)}</span>
-          ${stagePill(h.stage)}
-        </div>
         <div class="hi-title">${esc(h.title)}</div>
         <div class="hi-sub">
           <span class="ds-owner" data-nav="/user/${h.creator.username}">${avatar(h.creator, "sm")} <b>@${esc(h.creator.username)}</b></span>
-          <span class="hi-livechip"><span class="live-dot"></span> THE ORIGINAL <span class="eq on"><i></i><i></i><i></i></span> ON REPEAT</span>
+          <span class="hi-livechip"><span class="live-dot"></span> THE ORIGINAL <span class="eq on"><i></i><i></i><i></i></span></span>
+        </div>
+        <div class="hero-cta">
+          ${h.stage === "recreate_it" ? `<button class="btn btn-fire" data-nav="/create?kind=recreate&challenge=${h.id}">${ic("refresh", 14)} RECREATE THIS</button>` : ""}
+          <button class="btn hero-open" data-nav="/challenge/${h.id}">${h.stage === "champion" ? "VIEW RECORD" : "OPEN CHALLENGE"} ${ic("arrow", 13)}</button>
         </div>
       </div>
       <button class="p-sound" data-act="hero-sound" title="Toggle sound">${ic("volumeX", 18)}</button>
     </div>
-    <div class="event-stats">
-      <div class="ev-stat"><div class="v" data-count="${h.attempts_total}">0</div><div class="k">Attempts</div></div>
-      <div class="ev-stat"><div class="v gold" data-count="${h.recreate_count}">0</div><div class="k">of ${h.recreate_target.toLocaleString()} recreations</div></div>
-      <div class="ev-stat"><div class="v" data-count="${h.qualified}">0</div><div class="k">Beat-It qualified</div></div>
-      ${h.stage === "recreate_it" && h.days_left != null ? `<div class="ev-stat"><div class="v">${h.days_left}<span style="font-size:14px">d</span></div><div class="k">Remaining</div></div>` : ""}
-    </div>
-    <div class="event-cta">
-      ${h.stage === "recreate_it" ? `<button class="btn btn-fire" data-nav="/create?kind=recreate&challenge=${h.id}">${ic("refresh", 14)} RECREATE THIS</button>` : ""}
-      <button class="btn ${h.stage === "recreate_it" ? "btn-ghost" : "btn-fire"}" data-nav="/challenge/${h.id}">ENTER CHALLENGE ${ic("arrow", 14)}</button>
-    </div>
-  </div></div>
-  ${d.hero_feed.length ? `
-  <div class="hero-feed" style="margin-top:18px">
-    <div class="hf-label"><span class="live-dot"></span> RECREATE IT — LIVE ATTEMPTS ON ${esc(h.code)}</div>
-    <div class="feed-strip">${d.hero_feed.map(feedCard).join("")}</div>
-  </div>` : ""}` : `<div class="empty">${ic("film", 22)}<br>The Arena is waiting for its first challenge.</div>`}
-
-  ${secHead("02", "film", "THE ORIGINAL CHALLENGE", "this is the benchmark everyone is chasing")}
-  <div class="orig-band">
-    <div class="ob-left">
-      <span class="ob-code">${esc(h.code)}</span>
-      <span class="ob-title">${esc(h.title)}</span>
-      <span class="ob-meta">${stagePill(h.stage)} <span class="ob-by" data-nav="/user/${h.creator.username}">created by <b>@${esc(h.creator.username)}</b></span></span>
-    </div>
-    <div class="ob-right">
-      ${h.stage === "recreate_it" && h.days_left != null ? `<div class="ob-count"><b>${h.days_left}</b><span>DAYS LEFT</span></div>` : ""}
-      <div class="ob-acts">
-        ${h.stage === "recreate_it" ? `<button class="btn btn-fire" data-nav="/create?kind=recreate&challenge=${h.id}">${ic("refresh", 14)} RECREATE THIS</button>` : ""}
-        <button class="btn" data-nav="/challenge/${h.id}">OPEN CHALLENGE ${ic("arrow", 13)}</button>
+    <div class="hero-stats">
+      <div class="hs"><b data-count="${h.attempts_total}">0</b><span>attempts</span></div>
+      <div class="hs hs-wide">
+        <div class="hs-line"><div style="width:${Math.min(100, Math.round(h.recreate_count / h.recreate_target * 100))}%"></div></div>
+        <span><b>${h.recreate_count.toLocaleString()}</b> / ${h.recreate_target.toLocaleString()} recreations</span>
       </div>
+      <div class="hs"><b data-count="${h.qualified}">0</b><span>qualified</span></div>
+      ${h.stage === "recreate_it" && h.days_left != null ? `<div class="hs"><b>${h.days_left}d</b><span>left</span></div>` : ""}
     </div>
-  </div>
+  </div>` : `<div class="empty">${ic("film", 22)}<br>The Arena is waiting for its first challenge.</div>`}
 
-  ${d.hero_feed.length ? `
-  ${secHead("03", "refresh", "LATEST RECREATIONS", "the community is attempting it right now")}
+  ${secHead("", "refresh", "Latest recreations", "the community is attempting it right now")}
   <div class="feed-strip">${d.hero_feed.map(feedCard).join("")}</div>` : ""}
 
   ${d.hero_success.length ? `
-  ${secHead("04", "check", "VERIFIED — 100% RECREATIONS", "these people proved they can do it")}
+  ${secHead("", "check", "Verified — 100% recreations", "these people proved they can do it")}
   <div class="feed-strip verified-strip">${d.hero_success.map(feedCard).join("")}</div>` : ""}
 
-  ${secHead("05", "crown", "CURRENT CHAMPION", "")}
+  ${secHead("", "crown", "Current champion", "")}
   ${h.champion ? `
   <div class="champ-plate">
     <span class="cp-crown">${ic("crown", 48)}</span>
@@ -686,7 +668,7 @@ async function viewHome() {
   </div>`}
 
   ${d.champions.length ? `
-  ${secHead("06", "disc", "RECORDS & CHAMPIONS", "permanent history — records exist to be broken", ["Full ranks", "#/leaderboard"])}
+  ${secHead("", "disc", "Records & champions", "permanent history — records exist to be broken", ["Full ranks", "#/leaderboard"])}
   <div class="records-grid">${d.champions.map(recordCard).join("")}</div>` : ""}
 
   <div class="quote">“Maybe I don't have millions of followers. Maybe I'm not famous.<br>But I have something that is <em>uniquely mine</em>.”</div>`;
@@ -1425,6 +1407,36 @@ async function viewStory(jid) {
     <button class="btn btn-fire" data-nav="/challenge/${d.challenge.id}">${ic("flame", 13)} ENTER THIS CHALLENGE</button>
     <button class="btn" data-nav="/discover">BACK TO DISCOVERY</button>
   </div>`;
+}
+
+// ---------------- create sheet ----------------
+function openCreateSheet() {
+  if (!ME) { toast("Log in to start something."); setTimeout(() => location.hash = "/login", 450); return; }
+  const root = $("#modal-root");
+  root.innerHTML = `<div class="sheet-backdrop" id="sheet-bd">
+    <div class="sheet">
+      <div class="sheet-grip"></div>
+      <div class="sheet-h">Start something</div>
+      <button class="sheet-opt" data-nav="/create?kind=creation">
+        <span class="so-ico so-fire">${ic("spark", 20)}</span>
+        <span class="so-t"><b>CREATE IT</b><span>Submit something uniquely yours — it could become the next challenge</span></span>
+        ${ic("arrow", 15)}
+      </button>
+      <button class="sheet-opt" data-nav="/create?kind=recreate">
+        <span class="so-ico so-teal">${ic("refresh", 20)}</span>
+        <span class="so-t"><b>RECREATE</b><span>Attempt an active challenge — every try joins your journey</span></span>
+        ${ic("arrow", 15)}
+      </button>
+      <button class="sheet-opt" data-nav="/create?kind=beatit">
+        <span class="so-ico so-gold">${ic("zap", 20)}</span>
+        <span class="so-t"><b>BEAT IT</b><span>Your one final submission to surpass the original</span></span>
+        ${ic("arrow", 15)}
+      </button>
+    </div>
+  </div>`;
+  const close = () => root.innerHTML = "";
+  $("#sheet-bd").addEventListener("click", e => { if (e.target.id === "sheet-bd") close(); });
+  $$(".sheet-opt").forEach(o => o.addEventListener("click", close));
 }
 
 // ---------------- confirm modal ----------------
