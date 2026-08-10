@@ -2595,3 +2595,26 @@ body:has(#djr) #backbtn, body:has(.player) #backbtn{display:none !important}
 .set-color:hover{transform:scale(1.06)}
 .set-color:active{transform:scale(.9)}
 .set-color.on{transform:scale(1.1);box-shadow:0 0 0 3px var(--paper), 0 0 0 5px rgba(125,130,140,.55), 0 6px 16px rgba(0,0,0,.3)}
+
+/* ============================================================
+   v28 — immersive home rails (Recreate It / Beat It)
+   ============================================================ */
+.cirail{position:relative;height:min(70vh,560px);border-radius:20px;overflow:hidden;background:#000;
+  box-shadow:0 18px 50px rgba(0,0,0,.35);margin:4px 0 8px}
+.cirail-track{display:flex;height:100%;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;
+  overscroll-behavior-x:contain;scrollbar-width:none;touch-action:pan-x}
+.cirail-track::-webkit-scrollbar{display:none}
+.cirail-slide{position:relative;flex:0 0 100%;width:100%;height:100%;scroll-snap-align:start;scroll-snap-stop:always;background:#000}
+.cirail-slide video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:2}
+.cirail-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(26px) brightness(.4);z-index:1}
+.cr-ov{position:absolute;left:14px;right:14px;bottom:14px;z-index:4;display:flex;flex-direction:column;gap:8px;
+  padding-top:44px;background:linear-gradient(to top,rgba(4,5,8,.85),transparent)}
+.cr-k{font-family:var(--mono);font-size:9.5px;letter-spacing:.24em;color:#e8c15a;width:max-content;
+  background:rgba(8,9,12,.55);border:1px solid rgba(232,193,90,.3);border-radius:999px;padding:6px 12px;backdrop-filter:blur(8px)}
+.cr-rank.top{color:#ffe9ad;border-color:rgba(232,193,90,.6);box-shadow:0 0 18px rgba(232,193,90,.25)}
+.cr-creator{display:flex;align-items:center;gap:8px;color:#fff;font-size:13.5px;width:max-content;cursor:pointer}
+.cr-rate{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:rgba(236,238,241,.75);width:max-content}
+.record-now{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;color:var(--ink3);
+  padding:12px 4px 2px}
+.record-now b{font-family:var(--display);font-weight:900;font-size:22px;color:var(--gold);letter-spacing:.02em}
+.record-now .ic{color:var(--gold)}

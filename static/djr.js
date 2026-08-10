@@ -32,7 +32,6 @@ function djShell() {
       <div class="djr-src" id="djr-src">DISCOVERY</div>
       <div class="djr-topacts">
         <button class="djr-ico" data-act="dj-browse" aria-label="Browse">${ic("globe", 19)}</button>
-        <button class="djr-ico" data-act="dj-sound" id="djr-sound" aria-label="Sound">${ic("volumeX", 19)}</button>
       </div>
     </div>
     <div class="djr-bottom">
@@ -209,7 +208,7 @@ function djClearSlot(slot) {
   slot.innerHTML = "";
   delete slot.dataset.vid;
 }
-function djBuildSlot(slot, v) {
+function djBuildSlot(slot, v, resumeAt) {
   djClearSlot(slot);
   if (!v) return;
   slot.dataset.vid = String(v.id);
@@ -226,20 +225,33 @@ function djBuildSlot(slot, v) {
   el.addEventListener("playing", () => { if (slot.dataset.slot === "1") djShowLoad(false); });
   el.addEventListener("canplay", () => { if (slot.dataset.slot === "1") djShowLoad(false); });
   el.addEventListener("error", () => { if (slot.dataset.slot === "1") djShowError(slot, DJ.idx); });
+  if (resumeAt != null && resumeAt > 0.5) {
+    const applyResume = () => {
+      if (el.duration && resumeAt >= el.duration - 1) return;   // finished video → clean replay
+      try { el.currentTime = resumeAt; } catch (e) {}
+    };
+    if (el.readyState >= 1) applyResume();
+    else el.addEventListener("loadedmetadata", applyResume, { once: true });
+  }
   el.src = v.src;
   slot.appendChild(el);
+}
+function djResumeFor(i) {
+  const pos = DJ.positions.get(i);
+  if (pos == null || pos <= 0.5) return null;
+  return pos;
 }
 function djPaintWindow() {
   const win = djWin();
   if (!win) return;
   const slots = [...win.children];
-  const vids = [DJ.videos[DJ.idx - 1], DJ.videos[DJ.idx], DJ.videos[DJ.idx + 1]];
+  const hist = [DJ.idx - 1, DJ.idx, DJ.idx + 1];
   slots.forEach((slot, i) => {
     slot.dataset.slot = String(i);
-    const v = vids[i];
+    const v = DJ.videos[hist[i]];
     if (!v) { djClearSlot(slot); return; }
     if (slot.dataset.vid === String(v.id)) return;
-    djBuildSlot(slot, v);
+    djBuildSlot(slot, v, djResumeFor(hist[i]));
   });
 }
 function djActiveVideo() {
@@ -287,7 +299,14 @@ function djActivateCurrent() {
   const cur = djActiveVideo();
   if (cur) {
     const pos = DJ.positions.get(DJ.idx);
-    if (pos != null && pos > 0.5) { try { cur.currentTime = pos; } catch (e) {} }
+    if (pos != null && pos > 0.5) {
+      const doSeek = () => {
+        if (cur.duration && pos >= cur.duration - 1) { cur.currentTime = 0; DJ.positions.set(DJ.idx, 0); return; }
+        try { cur.currentTime = pos; } catch (e) {}
+      };
+      if (cur.readyState >= 1) doSeek();
+      else cur.addEventListener("loadedmetadata", doSeek, { once: true });
+    }
     cur.muted = DJ.muted;
     const p = cur.play();
     if (p) p.catch(() => {

@@ -121,6 +121,8 @@ CREATE TABLE IF NOT EXISTS champions_history(id INTEGER PRIMARY KEY, challenge_i
   video_id INTEGER, score REAL, achieved_at TEXT, superseded_at TEXT);
 CREATE INDEX IF NOT EXISTS idx_ch_hist ON champions_history(challenge_id);
 CREATE INDEX IF NOT EXISTS idx_vc_cat ON video_categories(category_id);
+CREATE TABLE IF NOT EXISTS blocks(id INTEGER PRIMARY KEY, blocker_id INTEGER, blocked_id INTEGER, created_at TEXT, UNIQUE(blocker_id, blocked_id));
+CREATE TABLE IF NOT EXISTS password_resets(id INTEGER PRIMARY KEY, user_id INTEGER, code TEXT, expires_at TEXT, used INTEGER DEFAULT 0);
 CREATE INDEX IF NOT EXISTS idx_cc_cat ON challenge_categories(category_id);
 """
 
@@ -197,7 +199,8 @@ def seed_if_empty():
     # demo sponsor: show the sponsored model in action (never overwrites real data)
     if not q1("SELECT 1 FROM challenges WHERE sponsor IS NOT NULL AND sponsor != ''"):
         q("UPDATE challenges SET sponsor='INDOMIE' WHERE id=3")
-    for stmt in ("ALTER TABLE videos ADD COLUMN views INTEGER DEFAULT 0",
+    for stmt in ("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''",
+                 "ALTER TABLE videos ADD COLUMN views INTEGER DEFAULT 0",
                  "ALTER TABLE videos ADD COLUMN reject_reason TEXT DEFAULT ''",
                  "ALTER TABLE videos ADD COLUMN eval_status TEXT DEFAULT 'pending'",
                  "ALTER TABLE videos ADD COLUMN evaluated_at TEXT",
@@ -464,12 +467,13 @@ def register():
     d = request.get_json(silent=True) or {}
     un = (d.get("username") or "").strip().lower()
     dn = (d.get("display_name") or "").strip() or un.title()
+    email = (d.get("email") or "").strip().lower()[:120]
     pw = d.get("password") or ""
     if not re.fullmatch(r"[a-z0-9_]{3,20}", un): return jsonify(error="Username: 3–20 chars, a-z 0-9 _"), 400
     if len(pw) < 6: return jsonify(error="Password must be at least 6 characters"), 400
     if q1("SELECT 1 FROM users WHERE username=?", (un,)): return jsonify(error="Username already taken"), 400
-    q("INSERT INTO users (username, display_name, pw, bio, avatar, color, created_at) VALUES (?,?,?,?,?,?,?)",
-      (un, dn, hash_pw(pw), "", secrets.choice(["😎","🤩","😊","😄","😇","🙂","🤗","😜","🥳","🤓","😏","😌","🕺","💃"]), secrets.choice(["#FF4D2E", "#22D3A5", "#7C5CFF", "#FFB300", "#5B8CFF", "#FF6FB2"]), now_iso()))
+    q("INSERT INTO users (username, display_name, pw, bio, avatar, color, email, created_at) VALUES (?,?,?,?,?,?,?,?)",
+      (un, dn, hash_pw(pw), "", secrets.choice(["😎","🤩","😊","😄","😇","🙂","🤗","😜","🥳","🤓","😏","😌","🕺","💃"]), secrets.choice(["#FF4D2E", "#22D3A5", "#7C5CFF", "#FFB300", "#5B8CFF", "#FF6FB2"]), email, now_iso()))
     uid = q1("SELECT id FROM users WHERE username=?", (un,))["id"]
     tok = secrets.token_hex(24)
     q("INSERT INTO sessions VALUES (?,?,?)", (tok, uid, now_iso()))
@@ -490,6 +494,54 @@ def login():
     resp = jsonify(me=user_pub(u), token=tok); resp.set_cookie("ci_token", tok, httponly=True, samesite="Lax", max_age=86400*30)
     return resp
 
+@app.post("/api/forgot-password")
+def forgot_password():
+    d = request.get_json(silent=True) or {}
+    ident = (d.get("identifier") or "").strip().lower()
+    u = q1("SELECT * FROM users WHERE username=? OR email=?", (ident, ident))
+    if not u: return jsonify(error="No account matches that username/email"), 404
+    import random as _rnd
+    code = f"{_rnd.randint(0, 999999):06d}"
+    q("INSERT INTO password_resets (user_id, code, expires_at, used) VALUES (?,?,?,0)",
+      (u["id"], code, now_iso(0.0104)))   # ~15 minutes
+    commit()
+    return jsonify(ok=True, code=code, message="V1 beta: your reset code is shown here. Email delivery is coming soon.")
+
+@app.post("/api/reset-password")
+def reset_password():
+    d = request.get_json(silent=True) or {}
+    ident = (d.get("identifier") or "").strip().lower()
+    u = q1("SELECT * FROM users WHERE username=? OR email=?", (ident, ident))
+    if not u: return jsonify(error="No account matches"), 404
+    r = q1("SELECT * FROM password_resets WHERE user_id=? AND code=? AND used=0 ORDER BY id DESC LIMIT 1", (u["id"], (d.get("code") or "").strip()))
+    if not r: return jsonify(error="Invalid reset code"), 400
+    if r["expires_at"] < now_iso(): return jsonify(error="Reset code expired — request a new one"), 400
+    if len(d.get("password") or "") < 6: return jsonify(error="New password must be at least 6 characters"), 400
+    q("UPDATE users SET pw=? WHERE id=?", (hash_pw(d["password"]), u["id"]))
+    q("UPDATE password_resets SET used=1 WHERE id=?", (r["id"],))
+    q("DELETE FROM sessions WHERE user_id=?", (u["id"],))
+    commit()
+    return jsonify(ok=True, message="Password updated. Log in with your new password.")
+
+@app.get("/api/me/blocks")
+@require_user
+def my_blocks(u):
+    rows = qa("SELECT u.* FROM blocks b JOIN users u ON u.id=b.blocked_id WHERE b.blocker_id=? ORDER BY b.id DESC", (u["id"],))
+    return jsonify(blocks=[user_pub(r) for r in rows])
+
+@app.post("/api/user/<username>/block")
+@require_user
+def block_user(u, username):
+    t = q1("SELECT id FROM users WHERE username=?", (username.lower(),))
+    if not t: return jsonify(error="Not found"), 404
+    if t["id"] == u["id"]: return jsonify(error="You cannot block yourself"), 400
+    if q1("SELECT 1 FROM blocks WHERE blocker_id=? AND blocked_id=?", (u["id"], t["id"])):
+        q("DELETE FROM blocks WHERE blocker_id=? AND blocked_id=?", (u["id"], t["id"])); blocked = False
+    else:
+        q("INSERT INTO blocks (blocker_id, blocked_id, created_at) VALUES (?,?,?)", (u["id"], t["id"], now_iso())); blocked = True
+    commit()
+    return jsonify(blocked=blocked)
+
 @app.post("/api/logout")
 def logout():
     tok = request.headers.get("X-CI-Token") or request.cookies.get("ci_token")
@@ -501,7 +553,7 @@ def me():
     u = current_user()
     if not u: return jsonify(me=None)
     unread = q1("SELECT COUNT(*) c FROM notifications WHERE user_id=? AND read=0", (u["id"],))["c"]
-    return jsonify(me={**user_pub(u), "unread": unread})
+    return jsonify(me={**user_pub(u), "unread": unread, "email": u["email"]})
 
 # ---------------------------------------------------------------- home & discovery
 @app.get("/api/home")
@@ -524,12 +576,13 @@ def home():
     discover = videos_pub(qa("SELECT * FROM videos WHERE kind='creation' AND status='approved' AND id NOT IN (SELECT COALESCE(original_video_id,0) FROM challenges) ORDER BY id DESC LIMIT 8"), me)
     hero_feed = videos_pub(qa("SELECT * FROM videos WHERE challenge_id=? AND kind='recreate' AND status='approved' ORDER BY (score IS NULL), id DESC LIMIT 12", (feat["id"],)), me) if feat else []
     hero_success = videos_pub(qa("SELECT * FROM videos WHERE challenge_id=? AND kind='recreate' AND status='approved' AND score>=100 ORDER BY id DESC LIMIT 10", (feat["id"],)), me) if feat else []
+    beat_feed = videos_pub(qa("SELECT * FROM videos WHERE challenge_id=? AND kind='beatit' AND status='approved' AND score IS NOT NULL ORDER BY score DESC, id DESC LIMIT 10", (feat["id"],)), me) if feat else []
     feed_create = videos_pub(qa("SELECT * FROM videos WHERE kind='creation' AND status='approved' ORDER BY id DESC LIMIT 10"), me)
     feed_recreate = videos_pub(qa("SELECT * FROM videos WHERE kind='recreate' AND status='approved' AND score>=100 ORDER BY id DESC LIMIT 10"), me)
     feed_beatit = videos_pub(qa("SELECT * FROM videos WHERE kind='beatit' AND status='approved' ORDER BY id DESC LIMIT 10"), me)
     return jsonify(hero=hero, live=live, beat=beat, trending=trending, discover=discover, champions=champs,
-                   hero_feed=hero_feed, hero_success=hero_success, feed_create=feed_create, feed_recreate=feed_recreate,
-                   feed_beatit=feed_beatit, sponsored=sponsored)
+                   hero_feed=hero_feed, hero_success=hero_success, beat_feed=beat_feed, feed_create=feed_create,
+                   feed_recreate=feed_recreate, feed_beatit=feed_beatit, sponsored=sponsored)
 
 @app.get("/api/challenges")
 def challenges_list():
@@ -649,6 +702,8 @@ def profile(username):
     records = [{"challenge": {"id": c["id"], "code": c["code"], "title": c["title"]}, "score": c["champion_score"],
                 "unbeaten_days": days_ago(c["champion_at"])} for c in qa("SELECT * FROM challenges WHERE champion_id=? ORDER BY champion_at DESC", (u["id"],))]
     created = challenges_pub(qa("SELECT * FROM challenges WHERE creator_id=? ORDER BY id DESC", (u["id"],)), me)
+    saved = challenges_pub(qa("""SELECT c.* FROM attempt_saves s JOIN challenges c ON c.id=s.challenge_id
+                                 WHERE s.user_id=? ORDER BY s.id DESC""", (u["id"],)), me)
     best_row = q1("SELECT MAX(score) s FROM videos WHERE user_id=? AND kind='recreate' AND score IS NOT NULL", (u["id"],))
     beatit_list = videos_pub(qa(f"SELECT * FROM videos WHERE user_id=? AND kind='beatit'{vis} ORDER BY id DESC", (u["id"],)), me)
     return jsonify(user=pub, stats={"champion": len(champs), "completed": completed, "attempts": attempts,
@@ -656,7 +711,7 @@ def profile(username):
                                      "created": len(created), "best_score": best_row["s"]},
                    champion_of=[{"id": c["id"], "code": c["code"], "title": c["title"], "score": c["champion_score"]} for c in champs],
                    journeys=journeys, creations=creation_list, uploads=uploads, attempts=attempts, records=records,
-                   created_challenges=created, beatit_list=beatit_list)
+                   created_challenges=created, beatit_list=beatit_list, saved=saved)
 
 @app.post("/api/user/socials")
 @require_user
@@ -694,7 +749,9 @@ def me_update(u):
     avatar = (d.get("avatar") or "").strip()[:8]
     color = (d.get("color") or "").strip()[:9]
     palette = ["#FF4D2E", "#22D3A5", "#7C5CFF", "#FFB300", "#5B8CFF", "#FF6FB2"]
+    email = (d.get("email") or "").strip().lower()[:120]
     sets, args = ["display_name=?", "bio=?"], [dn or u["display_name"], bio]
+    if "email" in d: sets.append("email=?"); args.append(email)
     if avatar: sets.append("avatar=?"); args.append(avatar)
     if color in palette: sets.append("color=?"); args.append(color)
     un = (d.get("username") or "").strip().lower()
@@ -708,7 +765,8 @@ def me_update(u):
     args.append(u["id"])
     q(f"UPDATE users SET {', '.join(sets)} WHERE id=?", tuple(args))
     commit()
-    return jsonify(ok=True, me=user_pub(u["id"]))
+    fresh = q1("SELECT * FROM users WHERE id=?", (u["id"],))
+    return jsonify(ok=True, me={**user_pub(u["id"]), "email": fresh["email"]})
 
 @app.post("/api/me/password")
 @require_user
@@ -953,12 +1011,14 @@ def discover_feed():
     elif f == "champions":
         rows = qa("SELECT * FROM videos WHERE kind='beatit' AND score IS NOT NULL ORDER BY score DESC LIMIT ? OFFSET ?", (limit, offset))
     else:
-        rows = qa("""SELECT v.*, (SELECT COUNT(*) FROM likes l WHERE l.video_id=v.id) lc,
+        blk = " AND v.user_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id=?)" if me else ""
+        args = (me["id"], limit, offset) if me else (limit, offset)
+        rows = qa(f"""SELECT v.*, (SELECT COUNT(*) FROM likes l WHERE l.video_id=v.id) lc,
                        (SELECT COUNT(*) FROM comments cm WHERE cm.video_id=v.id) cc,
                        (SELECT COUNT(*) FROM ratings rt WHERE rt.video_id=v.id) rc,
                        (SELECT COALESCE(AVG(r2.score),0) FROM ratings r2 WHERE r2.video_id=v.id) ra
-                     FROM videos v WHERE v.status='approved'
-                     ORDER BY (COALESCE(v.views,0) + lc*3 + cc*4 + rc*6 + ra*rc*2) DESC, v.id DESC LIMIT ? OFFSET ?""", (limit, offset))
+                     FROM videos v WHERE v.status='approved'{blk}
+                     ORDER BY (COALESCE(v.views,0) + lc*3 + cc*4 + rc*6 + ra*rc*2) DESC, v.id DESC LIMIT ? OFFSET ?""", args)
     return jsonify(videos=videos_pub(rows, me), filter=f)
 
 # ---------------------------------------------------------------- leaderboard & records

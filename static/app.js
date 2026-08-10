@@ -424,7 +424,6 @@ async function openPlayer(vid) {
   <div class="player p-full" id="player">
     <div class="pf-video"><video id="pl-video" src="${v.src}" poster="${v.poster || ""}" autoplay muted loop playsinline preload="auto"></video></div>
     <button class="icon-btn p-close" data-act="close-player">✕</button>
-    <button class="p-sound" data-act="player-sound" title="Tap to unmute">${ic("volumeX", 18)}</button>
     ${ch ? `<div class="p-top-ctx"><div class="ptc-pill">
       <span class="ptc-line1">${esc(ch.code)} · ${STAGE_META[ch.stage].label}</span>
       <span class="ptc-line2">${esc(ch.title)}</span></div></div>` : ""}
@@ -665,10 +664,70 @@ function beatBoard(c) {
 }
 
 let HOME_DATA = null;
+function railSlide(v, i, mode) {
+  const ov = mode === "rec" ? `
+    <div class="cr-ov">
+      <span class="cr-k">RECREATED · ATTEMPT #${v.attempt_no || "?"}${v.score != null ? ` · ${v.score}% MATCH` : ""}</span>
+      <div class="cr-creator" data-nav="/user/${v.owner.username}">${avatar(v.owner, "sm")} <b>@${esc(v.owner.username)}</b></div>
+      ${v.rating && v.rating.count ? `<span class="cr-rate">${ic("zap", 11)} ${v.rating.avg}/5 COMMUNITY</span>` : ""}
+    </div>` : `
+    <div class="cr-ov">
+      <span class="cr-k cr-rank${i === 0 ? " top" : ""}">${i === 0 ? ic("crown", 12) : "#" + (i + 1)} · BEAT IT FINAL · ${v.score}%</span>
+      <div class="cr-creator" data-nav="/user/${v.owner.username}">${avatar(v.owner, "sm")} <b>@${esc(v.owner.username)}</b></div>
+    </div>`;
+  return `<div class="cirail-slide" data-i="${i}">
+    ${v.poster ? `<img class="cirail-bg" src="${v.poster}" alt="" loading="lazy">` : ""}
+    ${ov}
+  </div>`;
+}
+function ciRailInit(id, vids) {
+  const root = document.getElementById(id);
+  if (!root || !vids || !vids.length || root.dataset.armed) return;
+  root.dataset.armed = "1";
+  const track = root.querySelector(".cirail-track");
+  const mount = (slide, i) => {
+    if (!slide || slide.querySelector("video")) return;
+    const v = vids[i]; if (!v) return;
+    const el = document.createElement("video");
+    el.setAttribute("playsinline", ""); el.playsInline = true;
+    el.preload = "auto"; el.muted = true;
+    if (v.poster) el.poster = v.poster;
+    el.addEventListener("ended", () => {
+      if (root.__active === i && i + 1 < vids.length) track.scrollTo({ left: (i + 1) * root.clientWidth, behavior: "smooth" });
+      else if (root.__active === i) { el.currentTime = 0; el.play().catch(() => {}); }
+    });
+    el.src = v.src;
+    slide.appendChild(el);
+  };
+  const strip = slide => { const vel = slide && slide.querySelector("video"); if (vel) { vel.pause(); vel.removeAttribute("src"); vel.load(); vel.remove(); } };
+  const activate = () => {
+    const i = Math.max(0, Math.min(vids.length - 1, Math.round(track.scrollLeft / Math.max(1, root.clientWidth))));
+    root.__active = i;
+    [...track.children].forEach((sl, j) => {
+      if (Math.abs(j - i) <= 1) mount(sl, j); else strip(sl);
+      const vel = sl.querySelector("video");
+      if (!vel) return;
+      if (j === i && root.__visible) vel.play().catch(() => { vel.muted = true; vel.play().catch(() => {}); });
+      else vel.pause();
+    });
+  };
+  track.addEventListener("click", e => {
+    const slide = e.target.closest(".cirail-slide");
+    if (!slide || e.target.closest("[data-nav]")) return;
+    const vel = slide.querySelector("video");
+    if (vel) { vel.muted = !vel.muted; if (!vel.muted) vel.play().catch(() => {}); }
+  });
+  let raf = 0;
+  track.addEventListener("scroll", () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; activate(); }); }, { passive: true });
+  new IntersectionObserver(es => es.forEach(en => { root.__visible = en.isIntersecting; activate(); }), { threshold: 0.35 }).observe(root);
+  activate();
+}
+
 async function viewHome() {
   const d = await api("/api/home");
   HOME_DATA = d;
   const h = d.hero;
+  setTimeout(() => { ciRailInit("rail-rec", d.hero_success); ciRailInit("rail-beat", d.beat_feed); }, 0);
   if (typeof regList === "function") {
     if (h) regList("home-hero", [h.original_video]);
     regList("home-feed", d.hero_feed || []);
@@ -697,7 +756,6 @@ async function viewHome() {
           <button class="btn hero-open" data-nav="/challenge/${h.id}">${h.stage === "champion" ? "VIEW RECORD" : "OPEN CHALLENGE"} ${ic("arrow", 13)}</button>
         </div>
       </div>
-      <button class="p-sound" data-act="hero-sound" title="Toggle sound">${ic("volumeX", 18)}</button>
     </div>
     <div class="hero-stats">
       <div class="hs"><b data-count="${h.attempts_total}">0</b><span>attempts</span></div>
@@ -710,12 +768,20 @@ async function viewHome() {
     </div>
   </div>
 
-  ${secHead("", "refresh", "Latest recreations", "the community is attempting it right now")}
-  <div class="feed-strip" data-vlist="home-feed" data-vlabel="LIVE ATTEMPTS">${d.hero_feed.map(feedCard).join("")}</div>` : `<div class="empty">${ic("film", 22)}<br>The Arena is waiting for its first challenge.</div>`}
+  <div style="height:10px"></div>` : `<div class="empty">${ic("film", 22)}<br>The Arena is waiting for its first challenge.</div>`}
 
   ${d.hero_success.length ? `
-  ${secHead("", "check", "Verified — 100% recreations", "these people proved they can do it")}
-  <div class="feed-strip verified-strip" data-vlist="home-verified" data-vlabel="VERIFIED 100%">${d.hero_success.map(feedCard).join("")}</div>` : ""}
+  ${secHead("", "refresh", "RECREATE IT", "approved recreations of this week's challenge — they play themselves")}
+  <div class="cirail" id="rail-rec">
+    <div class="cirail-track">${d.hero_success.map((v, i) => railSlide(v, i, "rec")).join("")}</div>
+  </div>` : ""}
+
+  ${d.beat_feed.length ? `
+  ${secHead("", "zap", "BEAT IT", "the record attack — the best current performance is on top")}
+  <div class="record-now">${ic("disc", 14)} CURRENT RECORD <b>${d.beat_feed[0].score}%</b> · @${esc(d.beat_feed[0].owner.username)}</div>
+  <div class="cirail" id="rail-beat">
+    <div class="cirail-track">${d.beat_feed.map((v, i) => railSlide(v, i, "beat")).join("")}</div>
+  </div>` : ""}
 
   ${secHead("", "crown", "Current champion", "")}
   ${h.champion ? `
@@ -1162,9 +1228,26 @@ function profTabHTML(tab) {
       </div>`;
     }).join("") : `<div class="empty">${ic("spark", 22)}<br>What can you do that nobody else can?</div>`}`;
   }
-  if (tab === "attempts") {
-    return d.attempts.length ? `<div class="grid3" data-vlist="prof-attempts" data-vlabel="ATTEMPTS">${d.attempts.map(v => videoCard(v)).join("")}</div>`
-      : `<div class="empty">${ic("target", 22)}<br>Every legend starts at attempt #1.</div>`;
+  if (tab === "recreates") {
+    const rec = (d.attempts || []).filter(v => v.score != null && v.score >= 100);
+    return rec.length ? `<div class="grid3" data-vlist="prof-recreates" data-vlabel="RECREATE IT">${rec.map(v => videoCard(v)).join("")}</div>`
+      : `<div class="empty">${ic("check", 22)}<br>No successful recreations yet — reach 100% to land here.</div>`;
+  }
+  if (tab === "beatit") {
+    const champ = (d.champion_of || []);
+    return (d.beatit_list.length || champ.length) ? `
+      ${champ.length ? `<div class="hint" style="margin-bottom:12px">${ic("crown", 13)} CHAMPION OF: ${champ.map(c => `<b data-nav="/challenge/${c.id}" style="cursor:pointer">${esc(c.code)}</b>`).join(" · ")}</div>` : ""}
+      ${d.beatit_list.length ? `<div class="grid3" data-vlist="prof-beatit" data-vlabel="BEAT IT">${d.beatit_list.map(v => videoCard(v)).join("")}</div>` : ""}`
+      : `<div class="empty">${ic("zap", 22)}<br>Beat It unlocks after a 100% recreate. One final shot.</div>`;
+  }
+  if (tab === "saved") {
+    const sv = d.saved || [];
+    return sv.length ? sv.map(c => `
+      <div class="srch-ch-row" data-nav="/challenge/${c.id}" style="margin-bottom:8px">
+        <div style="flex:1;min-width:0"><div class="sc-code">${esc(c.code)}</div><div class="sc-title">${esc(c.title)}</div></div>
+        ${stagePill(c.stage)}
+      </div>`).join("")
+      : `<div class="empty">${ic("target", 22)}<br>Tap ATTEMPT on any challenge to save it for later.</div>`;
   }
   if (tab === "journeys") {
     return d.journeys.length ? d.journeys.map(j => `
@@ -1212,7 +1295,8 @@ async function viewProfile(username) {
   PROF = d; PROF_TAB = "creations";
   if (typeof regList === "function") {
     regList("prof-uploads", d.uploads || []);
-    regList("prof-attempts", d.attempts || []);
+    regList("prof-recreates", (d.attempts || []).filter(v => v.score != null && v.score >= 100));
+    regList("prof-beatit", d.beatit_list || []);
     regList("prof-creations", d.creations || []);
   }
   const u = d.user, st = d.stats;
@@ -1243,8 +1327,9 @@ async function viewProfile(username) {
       } catch (err) { toast(err.message, true); }
     });
   }, 0);
-  const tabs = [["creations", "CREATIONS", d.creations.length], ["attempts", "ATTEMPTS", d.attempts.length],
-                ["journeys", "JOURNEYS", d.journeys.length], ["wins", "WINS", d.champion_of.length], ["records", "RECORDS", d.records.length]];
+  const recreates = (d.attempts || []).filter(v => v.score != null && v.score >= 100);
+  const tabs = [["creations", "CREATE IT", d.creations.length], ["recreates", "RECREATE IT", recreates.length],
+                ["beatit", "BEAT IT", d.beatit_list.length], ["journeys", "JOURNEY", d.journeys.length], ["saved", "ATTEMPTS", (d.saved || []).length]];
   return `
   <div class="prof-head">
     ${avatar(u, "lg")}
@@ -1550,6 +1635,19 @@ function confirmModal(title, body, okLabel, danger, cb) {
   $("#cfm-ok").onclick = () => { root.innerHTML = ""; cb(); };
 }
 
+function infoModal(title, body) {
+  const root = $("#modal-root");
+  root.innerHTML = `<div class="modal-backdrop" id="infm">
+    <div class="modal" style="max-width:440px">
+      <h2>${title}</h2>
+      <p style="margin-top:10px;font-size:13.5px;line-height:1.65;color:var(--ink2)">${body}</p>
+      <button class="btn btn-fire btn-block" style="margin-top:16px" id="infm-ok">GOT IT</button>
+    </div>
+  </div>`;
+  $("#infm-ok").onclick = () => root.innerHTML = "";
+  $("#infm").addEventListener("click", e => { if (e.target.id === "infm") root.innerHTML = ""; });
+}
+
 // ---------------- SETTINGS ----------------
 async function viewSettings() {
   if (!ME) return viewAuth("login", "Log in to open your settings.");
@@ -1579,6 +1677,7 @@ async function viewSettings() {
         const d = await api("/api/me/update", { method: "POST", json: {
           display_name: $("#set-name").value.trim(), bio: $("#set-bio").value.trim(),
           username: ($("#set-username").value.trim().toLowerCase() || undefined),
+          email: $("#set-email").value.trim(),
           avatar: pickFace, color: pickColor } });
         ME = { ...ME, ...d.me }; toast("Account saved."); renderChrome(); refreshMe();
       } catch (err) { toast(err.message, true); }
@@ -1589,6 +1688,32 @@ async function viewSettings() {
         $("#set-pw-old").value = ""; $("#set-pw-new").value = "";
         toast("Password updated.");
       } catch (err) { toast(err.message, true); }
+    });
+    // blocked users
+    (async () => {
+      const box = $("#set-blocks");
+      if (!box) return;
+      try {
+        const d = await api("/api/me/blocks");
+        box.innerHTML = d.blocks.length ? d.blocks.map(b => `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">
+            ${avatar(b, "sm")} <b data-nav="/user/${b.username}" style="cursor:pointer;flex:1">@${esc(b.username)}</b>
+            <button class="btn btn-sm" data-unblock="${esc(b.username)}">UNBLOCK</button>
+          </div>`).join("") : `<div class="set-note">You haven't blocked anyone. Keep it that way — the Arena is friendly.</div>`;
+        box.querySelectorAll("[data-unblock]").forEach(b => b.onclick = async () => {
+          try { await api(`/api/user/${b.dataset.unblock}/block`, { method: "POST" }); toast(`@${b.dataset.unblock} unblocked.`); b.closest("div").remove(); }
+          catch (e) { toast(e.message, true); }
+        });
+      } catch (e) { box.innerHTML = `<div class="set-note">Could not load blocked users.</div>`; }
+    })();
+    // legal modals
+    $$("[data-legal]").forEach(b => b.onclick = () => {
+      const kind = b.dataset.legal;
+      const title = kind === "terms" ? "TERMS OF PLAY" : "PRIVACY POLICY";
+      const body = kind === "terms"
+        ? "CreateIt is a competition platform: CREATE IT, RECREATE IT, BEAT IT. You keep ownership of what you upload; by submitting you grant CreateIt the right to feature it in challenges, journeys and promotions. Judging is human. Records are permanent. Be respectful — blocked behavior removes you from the Arena."
+        : "CreateIt collects only what the competition needs: your account details, your uploads, your attempts and scores. We never sell personal data. Your profile is public inside CreateIt; your email is never shown. You can delete your account by contacting the CreateIt team.";
+      infoModal(title, body);
     });
     $("#set-logout")?.addEventListener("click", () => {
       confirmModal("Log out of CreateIt?", "You can come back anytime — your journey is saved.", "LOG OUT", true, async () => {
@@ -1613,6 +1738,7 @@ async function viewSettings() {
     </div>
     <div class="field"><label>DISPLAY NAME</label><input class="input" id="set-name" value="${esc(ME.display_name)}" maxlength="40"></div>
     <div class="field"><label>USERNAME</label><input class="input" id="set-username" value="${esc(ME.username)}" maxlength="20" placeholder="3–20 letters/numbers"></div>
+    <div class="field"><label>EMAIL</label><input class="input" id="set-email" type="email" value="${esc(ME.email || "")}" placeholder="you@example.com"></div>
     <div class="field"><label>BIO</label><textarea class="input" id="set-bio" maxlength="160" placeholder="What makes you uniquely you?">${esc(ME.bio || "")}</textarea></div>
     <div class="field"><label>PROFILE PICTURE</label>
       <div class="set-faces" id="set-faces">${(window.SET_FACES||["😎","🤩","😊","😄","😇","🙂","🤗","😜","🥳","🤓","😏","😌","🕺","💃","🧑‍🎤","👩‍🎤"]).map(f => `<button type="button" class="set-face ${f===ME.avatar?"on":""}" data-face="${f}">${f}</button>`).join("")}</div>
@@ -1663,6 +1789,15 @@ async function viewSettings() {
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">${logoSVG(34)}<div><b style="font-family:var(--display);font-weight:900;font-size:18px">CREATE<span style="color:var(--red)">IT</span></b><div class="set-note" style="margin:0">Create It · Recreate It · Beat It</div></div></div>
     <p class="set-note">A platform where people create something unique, challenge the world to recreate it, and compete to beat it. Followers don't decide anything here — the challenge does.</p>
     <p class="set-note" style="margin-top:8px;font-family:var(--mono);font-size:9.5px;letter-spacing:.18em">BETA v17 · THE ARENA JOURNAL</p>
+  </div>
+
+  ${secHead("", "shield", "BLOCKED USERS", "")}
+  <div class="set-card"><div id="set-blocks"><div class="set-note">Loading…</div></div></div>
+
+  ${secHead("", "film", "LEGAL", "")}
+  <div class="set-card" style="display:flex;gap:10px;flex-wrap:wrap">
+    <button class="btn btn-sm" data-legal="terms">TERMS OF PLAY</button>
+    <button class="btn btn-sm" data-legal="privacy">PRIVACY POLICY</button>
   </div>
 
   <div class="set-card set-danger">
@@ -1760,12 +1895,13 @@ function viewAuth(mode, note) {
     const setMode = m => {
       $("#auth-title").textContent = m === "login" ? "WELCOME BACK" : "JOIN THE ARENA";
       $("#reg-name-field").style.display = m === "login" ? "none" : "block";
+      $("#reg-email-field").style.display = m === "login" ? "none" : "block";
       $("#auth-btn").textContent = m === "login" ? "LOG IN" : "CREATE ACCOUNT";
       tabL.classList.toggle("active", m === "login"); tabR.classList.toggle("active", m !== "login");
       tabL.onclick = () => setMode("login"); tabR.onclick = () => setMode("register");
       $("#auth-btn").onclick = async () => {
         const body = { username: $("#auth-user").value.trim(), password: $("#auth-pass").value };
-        if (m === "register") body.display_name = $("#auth-name").value.trim();
+        if (m === "register") { body.display_name = $("#auth-name").value.trim(); body.email = $("#auth-email").value.trim(); }
         try {
           const d = await api(m === "login" ? "/api/login" : "/api/register", { method: "POST", json: body });
           if (d.token) { try { localStorage.setItem("ci_token", d.token); } catch (e) {} }
@@ -1773,6 +1909,24 @@ function viewAuth(mode, note) {
           location.hash = "/";
         } catch (err) { toast(err.message, true); }
       };
+    };
+    $("#auth-forgot").onclick = () => {
+      const r = $("#auth-reset");
+      r.style.display = r.style.display === "none" ? "block" : "none";
+    };
+    $("#rst-get").onclick = async () => {
+      try {
+        const d = await api("/api/forgot-password", { method: "POST", json: { identifier: $("#rst-id").value.trim() } });
+        $("#rst-codebox").innerHTML = `YOUR RESET CODE: <b style="font-size:20px;letter-spacing:.28em">${esc(d.code)}</b><br><span style="font-size:11px;color:var(--dim)">${esc(d.message)}</span>`;
+        $("#rst-step2").style.display = "block";
+      } catch (err) { toast(err.message, true); }
+    };
+    $("#rst-do").onclick = async () => {
+      try {
+        await api("/api/reset-password", { method: "POST", json: { identifier: $("#rst-id").value.trim(), code: $("#rst-code").value.trim(), password: $("#rst-pass").value } });
+        toast("Password updated — log in with your new password.");
+        $("#auth-reset").style.display = "none"; $("#auth-pass").value = "";
+      } catch (err) { toast(err.message, true); }
     };
     setMode(mode === "register" ? "register" : "login");
     $$(".demo-chips .chip").forEach(ch => ch.onclick = () => {
@@ -1787,9 +1941,22 @@ function viewAuth(mode, note) {
       <div class="m-tabs"><button class="chip active" id="tab-login">Log in</button><button class="chip" id="tab-reg">Register</button></div>
       <h2 id="auth-title" style="font-family:var(--display);letter-spacing:1.4px;margin-bottom:14px">WELCOME BACK</h2>
       <div class="field" id="reg-name-field" style="display:none"><label>DISPLAY NAME</label><input class="input" id="auth-name" placeholder="How the arena should call you"></div>
+      <div class="field" id="reg-email-field" style="display:none"><label>EMAIL <span style="color:var(--dim);font-weight:400">(optional)</span></label><input class="input" id="auth-email" type="email" autocomplete="email" placeholder="you@example.com"></div>
       <div class="field"><label>USERNAME</label><input class="input" id="auth-user" autocomplete="username" placeholder="e.g. sarah"></div>
       <div class="field"><label>PASSWORD</label><input class="input" id="auth-pass" type="password" autocomplete="current-password" placeholder="••••••••"></div>
       <button class="btn btn-fire btn-block" id="auth-btn">LOG IN</button>
+      <button class="auth-link" id="auth-forgot" style="display:block;margin:12px auto 0;background:none;border:none;color:var(--ink3);font-family:var(--mono);font-size:10px;letter-spacing:.2em;cursor:pointer">FORGOT PASSWORD?</button>
+      <div id="auth-reset" style="display:none;margin-top:14px;border-top:1px dashed var(--line2);padding-top:14px">
+        <div class="hint" style="margin-bottom:10px">Enter your username or email — CreateIt gives you a reset code.</div>
+        <div class="field"><label>USERNAME OR EMAIL</label><input class="input" id="rst-id" placeholder="e.g. sarah"></div>
+        <button class="btn btn-sm" id="rst-get">GET RESET CODE</button>
+        <div id="rst-step2" style="display:none">
+          <div class="empty" style="padding:12px;margin:12px 0" id="rst-codebox"></div>
+          <div class="field"><label>RESET CODE</label><input class="input" id="rst-code" placeholder="6-digit code"></div>
+          <div class="field"><label>NEW PASSWORD</label><input class="input" id="rst-pass" type="password" placeholder="At least 6 characters"></div>
+          <button class="btn btn-sm btn-fire" id="rst-do">RESET PASSWORD</button>
+        </div>
+      </div>
       <div class="demo-accounts"><h5>Demo accounts (password shown)</h5>
         <div class="demo-chips">
           <button class="chip" data-u="admin" data-p="admin123">${ic("shield",12)} admin · admin123</button>
