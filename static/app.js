@@ -25,7 +25,12 @@ async function api(path, opts = {}) {
   }
   const hit = _apiCache.get(path);
   if (hit && Date.now() - hit.t < CACHE_TTL) return hit.d;
-  const r = await fetch(path, o);
+  let r;
+  try { r = await fetch(path, o); }
+  catch (netErr) {
+    if (!navigator.onLine) showOffline(true);
+    throw new Error("Network error — check your connection");
+  }
   let data = {};
   try { data = await r.json(); } catch (e) {}
   if (!r.ok) throw new Error(data.error || "Something went wrong");
@@ -187,11 +192,61 @@ function applyTheme(t) {
 }
 function applyThemePref(pref) {
   applyTheme(resolveTheme(pref));
+  statusBarForTheme(resolveTheme(pref));
   try { localStorage.setItem("ci-theme", pref); } catch (e) {}
 }
 matchMedia("(prefers-color-scheme: dark)").addEventListener && matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
   if (themePref() === "system") applyThemePref("system");
 });
+
+// ---------------- native shell (Capacitor) ----------------
+const IS_NATIVE = typeof window !== "undefined" && !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+function statusBarForTheme(t) {
+  if (!IS_NATIVE || !window.Capacitor.Plugins || !window.Capacitor.Plugins.StatusBar) return;
+  const SB = window.Capacitor.Plugins.StatusBar;
+  try {
+    if (t === "dark") { SB.setBackgroundColor({ color: "#0a0b0e" }); SB.setStyle({ style: "DARK" }); }
+    else { SB.setBackgroundColor({ color: "#efece4" }); SB.setStyle({ style: "LIGHT" }); }
+  } catch (e) {}
+}
+function initNative() {
+  if (!IS_NATIVE) return;
+  const P = window.Capacitor.Plugins || {};
+  statusBarForTheme(resolveTheme(themePref()));
+  // Android back button: navigate the SPA, exit only at root
+  if (P.App && P.App.addListener) {
+    P.App.addListener("backButton", ({ canGoBack }) => {
+      const path = (location.hash || "#/").slice(1).split("?")[0] || "/";
+      const atRoot = ["", "/", "/challenges", "/discover", "/leaderboard"].includes(path);
+      if (PLAYER_OPEN) { closePlayer(); return; }
+      if (document.querySelector("#modal-root .modal-backdrop, #modal-root .sheet-backdrop")) { document.querySelector("#modal-root").innerHTML = ""; return; }
+      if (atRoot || !canGoBack) P.App.exitApp();
+      else history.back();
+    });
+  }
+  // release the native splash once the web layer is alive
+  window.addEventListener("load", () => { setTimeout(() => { P.SplashScreen && P.SplashScreen.hide && P.SplashScreen.hide().catch(() => {}); }, 400); });
+}
+
+// ---------------- offline guard ----------------
+function showOffline(on) {
+  let el = document.getElementById("offline-guard");
+  if (on && !el) {
+    el = document.createElement("div");
+    el.id = "offline-guard";
+    el.innerHTML = `<div class="og-card">
+      ${logoSVG(40)}
+      <div class="og-t">You're offline</div>
+      <div class="og-s">Check your connection and try again. The Arena will be waiting.</div>
+      <button class="btn btn-fire" id="og-retry">${ic("refresh", 14)} RETRY</button>
+    </div>`;
+    document.body.appendChild(el);
+    document.getElementById("og-retry").addEventListener("click", () => { hideOffline(); route(); });
+  } else if (!on && el) el.remove();
+}
+function hideOffline() { const el = document.getElementById("offline-guard"); if (el) el.remove(); }
+window.addEventListener("offline", () => showOffline(true));
+window.addEventListener("online", () => hideOffline());
 
 // ---------------- splash ----------------
 (function splash() {
@@ -2070,6 +2125,7 @@ window.addEventListener("hashchange", () => {
 });
 
 (async function boot() {
+  initNative();
   await refreshMe();
   bindTilt();
   const path = (location.hash || "#/").slice(1).split("?")[0];

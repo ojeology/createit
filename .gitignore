@@ -15,3 +15,10 @@ nohup.out
 # caches
 .cache/
 *.egg-info/
+
+# mobile
+mobile/node_modules/
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/local.properties

@@ -58,3 +58,19 @@ On [render.com](https://render.com) → **New → Blueprint** → pick the repo.
 
 ## Intentionally deferred (future, per vision doc)
 AI-assisted scoring · sponsored/celebrity challenges · open challenges · money & rewards · follower-free discovery ranking algorithms.
+
+## Android app (Capacitor)
+The native shell lives in `mobile/`. It wraps the live CreateIt backend (`createit.onrender.com`) — the API, videos and database stay server-side; the APK is the native experience around them.
+
+- **App name:** CreateIt · **App ID:** `com.createit.app`
+- Plugins: status bar (theme-synced), splash screen, keyboard resize, native back button, offline guard
+
+### Build the APK
+**Option A — GitHub Actions (no local Android SDK needed):**
+Push to `main` (touching `mobile/` or `static/`) or run the **Android debug APK** workflow manually → download `createit-debug.apk` from the run's artifacts.
+
+**Option B — Android Studio:**
+```bash
+cd mobile && npm install && npx cap sync android
+npx cap open android   # then Run ▶ in Android Studio
+```
