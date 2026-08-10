@@ -79,8 +79,30 @@ async function djBoot() {
   djApplySoundBtn();
   const track = document.getElementById("djr-track");
   track.addEventListener("scroll", djOnScroll, { passive: true });
+  djArmGestures(track);
   if (!DJ.videos.length) await djEnter({ type: "trending", label: "TRENDING" }, 0);
   else { djBuildTrack(); djScrollTo(DJ.idx, false); djActivate(DJ.idx); }
+}
+
+function djArmGestures(track) {
+  if (!track || track.dataset.gestured) return;
+  track.dataset.gestured = "1";
+  let sx = 0, sy = 0;
+  track.addEventListener("pointerdown", e => { sx = e.clientX; sy = e.clientY; }, { passive: true });
+  track.addEventListener("pointerup", e => {
+    if (Math.abs(e.clientX - sx) > 12 || Math.abs(e.clientY - sy) > 12) return; // it was a swipe
+    const slide = e.target.closest(".djr-slide");
+    if (!slide || +slide.dataset.i !== DJ.idx) return;
+    const vid = slide.querySelector("video");
+    if (!vid) return;
+    if (vid.muted) {                                   // first gesture → sound on automatically
+      vid.muted = false; DJ.muted = false;
+      try { sessionStorage.setItem("dj-muted", "0"); } catch (err) {}
+      djApplySoundBtn();
+      vid.play().catch(() => {});
+    } else if (!vid.paused) vid.pause();
+    else vid.play().catch(() => {});
+  }, { passive: true });
 }
 
 function djTeardown() {
@@ -228,12 +250,8 @@ function djActivate(i) {
     cur.muted = DJ.muted;
     const p = cur.play();
     if (p) p.catch(() => {
-      cur.muted = true;
-      if (!DJ.muted) {
-        DJ.muted = true;
-        try { sessionStorage.setItem("dj-muted", "1"); } catch (e) {}
-        djApplySoundBtn(); djSoundHint();
-      }
+      cur.muted = true;               // OS blocked audible autoplay — stay quiet until first gesture
+      if (!DJ.muted) { djApplySoundBtn(); djSoundHint(); }
       cur.play().catch(() => {});
     });
   }
@@ -581,7 +599,7 @@ function openViewer(list, idx, label) {
   const srcEl = document.getElementById("djr-src"); if (srcEl) srcEl.textContent = DJ.source.label;
   djBuildTrack();
   const track = document.getElementById("djr-track");
-  if (track) track.addEventListener("scroll", djOnScroll, { passive: true });
+  if (track) { track.addEventListener("scroll", djOnScroll, { passive: true }); djArmGestures(track); }
   const i = Math.max(0, Math.min(idx || 0, list.length - 1));
   djScrollTo(i, false); djActivate(i);
 }

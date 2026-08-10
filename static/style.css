@@ -2530,3 +2530,17 @@ button,a{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 
 /* hide the global back button behind any open viewer layer */
 body:has(#djr) #backbtn, body:has(.player) #backbtn{display:none !important}
+
+/* ============================================================
+   v24 — swipe-safe overlays, automatic audio, CREATE IT stage
+   ============================================================ */
+/* overlays never eat swipes; only their buttons are tappable */
+.djr-top,.djr-bottom,.djr-count{pointer-events:none}
+.djr-top .djr-ico,.djr-bar .djr-act,.djr-creator,.djr-bottom button{pointer-events:auto}
+.djr-slide video{pointer-events:none}
+.djr-track{cursor:grab}
+.djr-track:active{cursor:grabbing}
+
+/* CREATE IT stage panel */
+.sp-create{background:radial-gradient(120% 140% at 12% 0%,rgba(124,92,255,.24),transparent 45%),linear-gradient(140deg,#251d3f,#131022)}
+.sp-create .sp-name{color:#e9e4ff}

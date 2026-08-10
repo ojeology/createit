@@ -1122,6 +1122,9 @@ def admin_sponsor(u):
 @require_admin
 def admin_submissions(u):
     st = request.args.get("status") or "pending"
+    if st == "all":
+        rows = qa("SELECT * FROM videos ORDER BY id DESC LIMIT 100")
+        return jsonify(submissions=videos_pub(rows, u), status="all")
     if st not in ("pending", "approved", "rejected"): st = "pending"
     rows = qa("SELECT * FROM videos WHERE status=? ORDER BY id DESC LIMIT 60", (st,))
     return jsonify(submissions=videos_pub(rows, u), status=st)

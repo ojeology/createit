@@ -334,7 +334,7 @@ function renderChrome() {
     <button class="rail-item ${route.startsWith("/attempts") ? "active" : ""}" data-nav="/attempts"><span class="ico">${ic("target", 18)}</span>Attempts</button>
     <button class="rail-item ${route.startsWith("/leaderboard") ? "active" : ""}" data-nav="/leaderboard"><span class="ico">${ic("trophy", 18)}</span>Ranks</button>
     <button class="rail-item ${route.startsWith("/notifications") ? "active" : ""}" data-nav="/notifications"><span class="ico">${ic("bell", 18)}</span>Notifications${unread ? ` <span class="dot-badge" style="position:static;margin-left:4px">${unread}</span>` : ""}</button>
-    ${ME?.is_admin ? `<button class="rail-item ${route.startsWith("/admin") ? "active" : ""}" data-nav="/admin"><span class="ico">${ic("shield", 18)}</span>Admin</button>` : ""}
+    ${ME?.is_admin ? `<button class="rail-item ${route.startsWith("/admin") ? "active" : ""}" data-nav="/admin"><span class="ico">${ic("shield", 18)}</span>Admin Panel</button>` : ""}
     ${railUser}`;
 }
 
@@ -802,15 +802,21 @@ async function viewChallenges(query) {
     </div>
   </div>
   <div class="stage-panels">
+    <button class="stage-panel sp-create" data-nav="/create?kind=creation">
+      <span class="sp-k">STAGE 1 · START HERE</span>
+      <span class="sp-name">CREATE IT</span>
+      <span class="sp-desc">Have something nobody else can do? Make it the next challenge.</span>
+      <span class="sp-meta">SUBMIT YOUR CREATION ${ic("arrow", 14)}</span>
+    </button>
     <button class="stage-panel sp-rec" data-nav="/arena/recreate">
-      <span class="sp-k">STAGE 1 · OPEN TO EVERYONE</span>
+      <span class="sp-k">STAGE 2 · OPEN TO EVERYONE</span>
       <span class="sp-name">RECREATE IT</span>
       <span class="sp-desc">Prove you can reproduce the original creation, exactly as it was done.</span>
       <span class="sp-meta">${live.length} CHALLENGE${live.length === 1 ? "" : "S"} OPEN ${ic("arrow", 14)}</span>
     </button>
     <button class="stage-panel sp-beat" data-nav="/arena/beatit">
       ${ready.length ? `<span class="sp-flag">YOU'RE READY</span>` : ""}
-      <span class="sp-k">STAGE 2 · QUALIFIED ONLY</span>
+      <span class="sp-k">STAGE 3 · QUALIFIED ONLY</span>
       <span class="sp-name">BEAT IT</span>
       <span class="sp-desc">Reach 100% first. Then one final submission to surpass the original.</span>
       <span class="sp-meta">${ME ? ready.length + " READY FOR YOU" : beatAll.length + " IN FINAL STAGE"} ${ic("arrow", 14)}</span>
@@ -1244,7 +1250,7 @@ async function viewProfile(username) {
     <div class="prof-id"><h1>${esc(u.display_name)}</h1><div class="un">@${esc(u.username)} ${u.is_admin ? '· <span class="pill-mini pm-gold">CREATEIT TEAM</span>' : ""}</div>
       <div style="color:var(--mut);font-size:13.5px;margin-top:4px">${esc(u.bio || "No bio yet — too busy practicing.")}</div></div>
     <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">${followBtn}
-      ${own ? `<button class="btn btn-sm" data-nav="/settings">${ic("gear", 14)} SETTINGS</button>` : ""}
+      ${own ? `<button class="btn btn-sm" data-nav="/settings">${ic("gear", 14)} SETTINGS</button>${ME.is_admin ? `<button class="btn btn-sm" data-nav="/admin">${ic("shield", 14)} ADMIN</button>` : ""}` : ""}
       <div style="color:var(--mut);font-size:13px"><b style="color:var(--text)">${u.followers}</b> followers · <b style="color:var(--text)">${u.following}</b> following</div></div>
   </div>
   <div class="socials" style="margin:4px 0 6px">${socChips}${own ? `<button class="soc-chip" id="btn-edit-socials">${ic("plus", 12)} EDIT SOCIALS</button>` : ""}
@@ -1775,14 +1781,16 @@ function admSubRow(v, st) {
   const kindChip = v.kind === "creation" ? '<span class="pill-mini pm-violet">CREATE IT</span>'
     : v.kind === "beatit" ? '<span class="pill-mini pm-fire">BEAT IT</span>'
     : '<span class="pill-mini pm-teal">RECREATE</span>';
-  const statusChip = st === "pending" ? '<span class="st-chip stc-pending">PENDING</span>'
-    : st === "rejected" ? '<span class="st-chip stc-rejected">REJECTED</span>'
+  const eff = st === "all" ? v.status : st;
+  const statusChip = eff === "pending" ? '<span class="st-chip stc-pending">PENDING</span>'
+    : eff === "rejected" ? '<span class="st-chip stc-rejected">REJECTED</span>'
+    : eff === "live" ? '<span class="st-chip stc-challenge">CHALLENGE</span>'
     : '<span class="st-chip stc-approved">APPROVED</span>';
-  const acts = st === "pending"
+  const acts = eff === "pending"
     ? `<button class="mini-btn" data-review="${v.id}" data-review-act="approve">APPROVE</button>
        ${v.kind === "creation" ? `<button class="mini-btn" data-mkch="${v.id}" style="background:var(--grad-fire);border:none;color:#fff;font-weight:800">${ic("trophy", 12)} MAKE CHALLENGE</button>` : ""}
        <button class="mini-btn" data-review="${v.id}" data-review-act="reject">REJECT</button>`
-    : st === "rejected"
+    : eff === "rejected"
     ? `<button class="mini-btn" data-review="${v.id}" data-review-act="approve">RESTORE</button>`
     : `<button class="mini-btn" data-review="${v.id}" data-review-act="reject">REJECT</button>`;
   return `<div class="adm-row">
@@ -1790,7 +1798,7 @@ function admSubRow(v, st) {
     <div class="ar-mid"><div class="t">${esc(v.title)} ${kindChip}${v.nominated ? ' <span class="pill-mini pm-fire">SELF-NOMINATED</span>' : ""}</div>
       <div class="s">@${esc(v.owner.username)} · ${v.challenge ? esc(v.challenge.code) : "no challenge"} · ${timeAgo(v.created_at)}${st === "approved" && v.score != null ? ` · scored ${v.score}%` : ""}</div></div>
     <div class="ar-acts">${acts}${statusChip}</div>
-    ${v.kind === "creation" && st === "pending" ? `<div id="mkch-${v.id}" style="display:none;width:100%;border-top:1px dashed var(--line2);padding-top:10px;margin-top:4px">
+    ${v.kind === "creation" && eff === "pending" ? `<div id="mkch-${v.id}" style="display:none;width:100%;border-top:1px dashed var(--line2);padding-top:10px;margin-top:4px">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <input class="input" id="ch-title-${v.id}" value="${esc(v.title)}" style="flex:2;min-width:160px">
         <select class="input" id="ch-cat-${v.id}" style="width:150px"><option value="">No category</option>${(window.__admCats || []).map(c => `<option value="${c.id}">${esc(c.parent ? c.parent + " · " : "")}${esc(c.name)}</option>`).join("")}</select>
@@ -1890,6 +1898,7 @@ async function viewAdmin() {
       <button class="adm-tab active" data-ast="pending">PENDING</button>
       <button class="adm-tab" data-ast="approved">APPROVED</button>
       <button class="adm-tab" data-ast="rejected">REJECTED</button>
+      <button class="adm-tab" data-ast="all">ALL SUBMISSIONS</button>
     </div>
     <div id="adm-subs">${renderAdminSubs(q1d.pending, "pending")}</div>
   </div>
