@@ -172,6 +172,17 @@ function ic(name, size = 16, cls = "") {
   return `<svg class="ic ${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${fill}>${body}</svg>`;
 }
 
+// ---------------- theme ----------------
+function applyTheme(t) {
+  if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
+  else document.documentElement.removeAttribute("data-theme");
+  try { localStorage.setItem("ci-theme", t || "light"); } catch (e) {}
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  applyTheme(cur === "dark" ? "light" : "dark");
+}
+
 // ---------------- splash ----------------
 (function splash() {
   const s = document.getElementById("splash");
@@ -226,7 +237,8 @@ function renderChrome() {
   $("#topbar").innerHTML = `
     <a data-nav="/" href="#/" aria-label="CreateIt home">${brandHTML(24)}</a>
     <span class="tagline">Create It · Recreate It · Beat It</span>
-    <span class="tb-spacer"></span>${bell}${userBtn}`;
+    <span class="tb-spacer"></span>
+    <button class="icon-btn theme-btn" id="btn-theme" title="Switch theme">◐</button>${bell}${userBtn}`;
 
   const items = [
     { ico: "home", label: "HOME", path: "/" },
@@ -253,13 +265,17 @@ function renderChrome() {
     <button class="rail-item ${route.startsWith("/challenges") ? "active" : ""}" data-nav="/challenges"><span class="ico">${ic("flame", 18)}</span>Arena</button>
     <button class="rail-item rail-create" data-nav="/create"><span class="ico">${ic("plus", 18)}</span>Create</button>
     <button class="rail-item ${route.startsWith("/discover") ? "active" : ""}" data-nav="/discover"><span class="ico">${ic("eye", 18)}</span>Discover</button>
+    <button class="rail-item ${route.startsWith("/attempts") ? "active" : ""}" data-nav="/attempts"><span class="ico">${ic("target", 18)}</span>Attempts</button>
     <button class="rail-item ${route.startsWith("/leaderboard") ? "active" : ""}" data-nav="/leaderboard"><span class="ico">${ic("trophy", 18)}</span>Ranks</button>
     <button class="rail-item ${route.startsWith("/notifications") ? "active" : ""}" data-nav="/notifications"><span class="ico">${ic("bell", 18)}</span>Notifications${unread ? ` <span class="dot-badge" style="position:static;margin-left:4px">${unread}</span>` : ""}</button>
     ${ME?.is_admin ? `<button class="rail-item ${route.startsWith("/admin") ? "active" : ""}" data-nav="/admin"><span class="ico">${ic("shield", 18)}</span>Admin</button>` : ""}
+    <button class="rail-item" id="btn-theme-rail"><span class="ico">◐</span>Theme</button>
     ${railUser}`;
 }
 
 document.addEventListener("click", e => {
+  if (!e.target.closest(".rate")) $$(".rate.open").forEach(r => r.classList.remove("open"));
+  if (e.target.closest("#btn-theme, #btn-theme-rail")) { toggleTheme(); return; }
   if (e.target.id === "btn-logout") {
     api("/api/logout", { method: "POST" }).then(() => { ME = null; toast("Logged out. Come back with something unique."); route(); });
     return;
@@ -323,7 +339,7 @@ function videoCard(v, opts = {}) {
     </div>
     <div class="v-foot">${avatar(v.owner, "sm")}
       <span class="who">@${esc(v.owner.username)}</span>
-      <span class="stats"><span>${ic("eye", 12)} ${v.views || 0}</span><span>${ic("heart", 12)} ${v.likes}</span></span>
+      <span class="stats"><span>${ic("eye", 12)} ${v.views || 0}</span><span class="rate-chip">${ic("zap", 12)} <b>${v.rating && v.rating.avg ? v.rating.avg : "—"}</b>${v.rating && v.rating.count ? ` <em>(${v.rating.count})</em>` : ""}</span></span>
     </div>
   </div>`;
 }
@@ -356,15 +372,16 @@ async function openPlayer(vid) {
       <div class="pc-owner" data-nav="/user/${v.owner.username}">${avatar(v.owner, "sm")} <b>@${esc(v.owner.username)}</b>
         <span class="pv">${ic("eye", 12)} ${v.views.toLocaleString()}</span></div>
       <div class="pc-acts">
-        ${ch && ch.stage === "recreate_it" ? `<button class="btn btn-teal btn-sm" data-nav="/create?kind=recreate&challenge=${ch.id}">${ic("refresh", 13)} ATTEMPT THIS</button>` : ""}
+        ${ch && ch.stage === "recreate_it" ? `<button class="btn btn-teal btn-sm" data-nav="/create?kind=recreate&challenge=${ch.id}">${ic("refresh", 13)} SUBMIT ATTEMPT</button>` : ""}
         ${v.kind === "recreate" && ch ? `<button class="btn btn-sm" data-nav="/journey/${ch.id}/${v.owner.id}">${ic("spark", 13)} VIEW JOURNEY</button>` : ""}
         ${ch ? `<button class="btn btn-sm btn-ghost" data-nav="/challenge/${ch.id}">CHALLENGE ${ic("arrow", 13)}</button>` : ""}
       </div>
     </div>
     <div class="p-rail">
-      <button class="rail-act ${v.liked ? "on" : ""}" data-act="like" data-vid="${v.id}" id="pl-like">${ic("heart", 22)}<span>${v.likes}</span></button>
+      ${rateControl(v)}
       <button class="rail-act" data-act="player-comments">${ic("chat", 22)}<span>${v.comments}</span></button>
-      <button class="rail-act" data-act="share">${ic("share", 20)}</button>
+      <button class="rail-act" data-act="share" data-vid="${v.id}">${ic("share", 20)}<span class="rate-lbl">SHARE</span></button>
+      ${ch ? `<button class="rail-act attempt-btn ${ch.mine && ch.mine.saved ? "on" : ""}" data-act="attempt-save" data-cid="${ch.id}">${ic("target", 20)}<span class="rate-lbl att-lbl">${ch.mine && ch.mine.saved ? "SAVED" : "ATTEMPT"}</span></button>` : ""}
     </div>
     <div class="p-comments" id="p-comments" style="display:none">
       <h4>COMMENTS (${d.comments.length}) <button class="icon-btn" style="width:30px;height:30px;font-size:13px" data-act="player-comments">✕</button></h4>
@@ -410,6 +427,26 @@ document.addEventListener("click", async e => {
         : `<div class="empty">${el.dataset.empty}</div>`;
       area.classList.add("stage-area");
       runCountUps(); bindTilt();
+    }
+    else if (act === "rate-open") {
+      const rateEl = el.closest(".rate");
+      const wasOpen = rateEl.classList.contains("open");
+      $$(".rate.open").forEach(r => r.classList.remove("open"));
+      if (!wasOpen) {
+        rateEl.classList.add("open");
+        paintGauge(rateEl, +rateEl.dataset.mine || 0, 0);
+      }
+    }
+    else if (act === "attempt-save") {
+      if (!ME) { toast("Log in to add challenges to your Attempts"); setTimeout(() => location.hash = "/login", 400); return; }
+      const cid = el.dataset.cid;
+      try {
+        const d = await api(`/api/challenge/${cid}/attempt-toggle`, { method: "POST" });
+        el.classList.toggle("on", d.saved);
+        el.classList.remove("attempt-saved"); void el.offsetWidth; el.classList.add("attempt-saved");
+        const l = el.querySelector(".att-lbl"); if (l) l.textContent = d.saved ? "SAVED" : "ATTEMPT";
+        toast(d.saved ? "Saved to Attempts — go practice." : "Removed from Attempts");
+      } catch (err) { toast(err.message, true); }
     }
     else if (act === "disc-follow") {
       if (!ME) { location.hash = "/login"; return; }
@@ -1104,14 +1141,14 @@ function discSlideHTML(v, i) {
       <div class="ds-owner" data-nav="/user/${v.owner.username}">${avatar(v.owner, "sm")} @${esc(v.owner.username)}</div>
       ${ch ? `<div class="ds-act">
         <button class="btn btn-sm" data-nav="/challenge/${ch.id}">${esc(ch.code)} ${ic("arrow", 12)}</button>
-        ${ch.stage === "recreate_it" ? `<button class="btn btn-sm btn-fire" data-nav="/create?kind=recreate&challenge=${ch.id}">${ic("zap", 12)} ATTEMPT</button>` : ""}
+        ${ch.stage === "recreate_it" ? `<button class="btn btn-sm btn-fire" data-nav="/create?kind=recreate&challenge=${ch.id}">${ic("zap", 12)} SUBMIT ATTEMPT</button>` : ""}
       </div>` : ""}
     </div>
     <div class="disc-rail">
-      <button class="rail-act ds-follow" data-act="disc-follow" data-user="${esc(v.owner.username)}" title="Follow @${esc(v.owner.username)}">＋</button>
-      <button class="rail-act ${v.liked ? "on" : ""}" data-act="like" data-vid="${v.id}">${ic("heart", 22)}<span>${v.likes}</span></button>
+      ${rateControl(v)}
       <button class="rail-act" data-act="open-video" data-vid="${v.id}">${ic("chat", 22)}<span>${v.comments}</span></button>
       <button class="rail-act" data-act="share" data-vid="${v.id}">${ic("share", 20)}</button>
+      ${ch ? `<button class="rail-act attempt-btn ${ch.mine && ch.mine.saved ? "on" : ""}" data-act="attempt-save" data-cid="${ch.id}">${ic("target", 20)}<span class="rate-lbl att-lbl">${ch.mine && ch.mine.saved ? "SAVED" : "ATTEMPT"}</span></button>` : ""}
     </div>
   </div>`;
 }
@@ -1188,6 +1225,34 @@ async function viewDiscover(query) {
     loadDiscFeed(filter, q0);
   }, 0);
   return shell;
+}
+
+// ---------------- MY ATTEMPTS page ----------------
+async function viewAttempts() {
+  if (!ME) return viewAuth("login", "Log in to see the challenges you saved to attempt.");
+  const d = await api("/api/attempts");
+  return `
+  <div class="page-head">
+    <span class="crumb">MY ATTEMPTS</span>
+    <h1 class="big-title">THE ATTEMPT LIST</h1>
+    <div class="meta-row">Challenges you chose to try. Watch · practice · record · submit.</div>
+  </div>
+  ${d.challenges.length ? d.challenges.map(c => `
+    <div class="att-row">
+      <div class="att-th" data-nav="/challenge/${c.id}">${thumb(c.original_video)}</div>
+      <div class="att-mid">
+        <div class="att-code">${esc(c.code)}</div>
+        <div class="att-title">${esc(c.title)}</div>
+        <div class="att-meta"><span>by @${esc(c.creator.username)}</span><span>BENCHMARK ${c.top ? c.top.score + "%" : "100%"}</span>
+          <span style="color:${c.submitted ? "var(--green)" : "var(--red)"}">${c.submitted ? "SUBMITTED" : "NOT SUBMITTED YET"}</span></div>
+        <div style="margin-top:7px">${stagePill(c.stage)}</div>
+      </div>
+      <div class="att-acts">
+        <button class="btn btn-sm" data-nav="/challenge/${c.id}">OPEN</button>
+        ${c.stage === "recreate_it" ? `<button class="btn btn-sm btn-fire" data-nav="/create?kind=recreate&challenge=${c.id}">SUBMIT ATTEMPT</button>` : ""}
+        <button class="btn btn-sm btn-ghost" data-act="attempt-save" data-cid="${c.id}">REMOVE</button>
+      </div>
+    </div>`).join("") : `<div class="empty">${ic("target", 22)}<br>Your attempt list is empty. Find a challenge in Discover and press ATTEMPT.</div>`}`;
 }
 
 // ---------------- attempt journey timeline ----------------
@@ -1421,6 +1486,72 @@ async function viewAdmin() {
   </div>`;
 }
 
+// ---------------- CREATEIT RATING (1–5 swipe gauge) ----------------
+const RATE_WORDS = ["", "LOW", "GOOD", "IMPRESSIVE", "INSANE", "EXCEPTIONAL"];
+function rateControl(v, compact = false) {
+  const mine = (v.rating && v.rating.mine) || 0;
+  const avg = (v.rating && v.rating.avg) || 0;
+  const count = (v.rating && v.rating.count) || 0;
+  return `<div class="rate ${mine ? "mine" : ""}" data-vid="${v.id}" data-mine="${mine}" data-avg="${avg}" data-count="${count}">
+    <button class="rate-btn" data-act="rate-open" aria-label="Rate this">
+      ${ic("zap", 20)}<span class="rate-lbl">${mine ? mine + "/5" : "RATE"}</span>
+    </button>
+    <div class="rate-pop">
+      <div class="rate-head">HOW IMPRESSIVE?</div>
+      <div class="rate-gauge">${[1,2,3,4,5].map(n => `<div class="rg-c" data-n="${n}">${n}</div>`).join("")}</div>
+      <div class="rate-foot">${avg ? `<b>${avg}</b>/5 · ${count} rating${count === 1 ? "" : "s"}` : "BE THE FIRST"}</div>
+    </div>
+  </div>`;
+}
+let _rateDrag = null;
+function paintGauge(rateEl, n, peek) {
+  rateEl.querySelectorAll(".rg-c").forEach(c => {
+    const cn = +c.dataset.n;
+    c.classList.toggle("on", cn <= n);
+    c.classList.toggle("peek", !!peek && cn === peek);
+  });
+}
+function gaugeValFromY(g, y) {
+  const r = g.getBoundingClientRect();
+  const rel = 1 - (y - r.top) / r.height;
+  return Math.max(1, Math.min(5, Math.ceil(rel * 5)));
+}
+async function commitRate(rateEl, n) {
+  const vid = rateEl.dataset.vid;
+  rateEl.dataset.mine = n;
+  rateEl.classList.add("mine");
+  const lbl = rateEl.querySelector(".rate-lbl");
+  if (lbl) lbl.textContent = n + "/5";
+  rateEl.classList.remove("rate-flash"); void rateEl.offsetWidth; rateEl.classList.add("rate-flash");
+  rateEl.classList.remove("open");
+  try {
+    const d = await api(`/api/video/${vid}/rate`, { method: "POST", json: { score: n } });
+    rateEl.dataset.avg = d.avg; rateEl.dataset.count = d.count;
+    const foot = rateEl.querySelector(".rate-foot");
+    if (foot) foot.innerHTML = `<b>${d.avg}</b>/5 · ${d.count} rating${d.count === 1 ? "" : "s"}`;
+    toast(`Rated ${n}/5 — ${RATE_WORDS[n]}`);
+  } catch (err) { toast(err.message, true); }
+}
+document.addEventListener("pointerdown", e => {
+  const g = e.target.closest(".rate-gauge");
+  if (!g) return;
+  e.preventDefault();
+  const rateEl = g.closest(".rate");
+  _rateDrag = { g, rateEl };
+  paintGauge(rateEl, gaugeValFromY(g, e.clientY), gaugeValFromY(g, e.clientY));
+});
+document.addEventListener("pointermove", e => {
+  if (!_rateDrag) return;
+  paintGauge(_rateDrag.rateEl, 0, gaugeValFromY(_rateDrag.g, e.clientY));
+});
+document.addEventListener("pointerup", e => {
+  if (!_rateDrag) return;
+  const { g, rateEl } = _rateDrag;
+  _rateDrag = null;
+  if (!ME) { toast("Log in to rate creations"); setTimeout(() => location.hash = "/login", 400); rateEl.classList.remove("open"); return; }
+  commitRate(rateEl, gaugeValFromY(g, e.clientY));
+});
+
 // ---------------- signature moments ----------------
 const MOMENTS = new Set();
 function showMoment(pct, vid) {
@@ -1470,6 +1601,26 @@ const VIEWS = {
   "/register": (q) => viewAuth("register"),
 };
 
+let NAV_STACK = [];
+const ROOT_PATHS = new Set(["/", "/challenges", "/discover", "/leaderboard"]);
+function updateBackBtn(path) {
+  let bb = $("#backbtn");
+  if (!bb) {
+    bb = document.createElement("button");
+    bb.id = "backbtn";
+    bb.innerHTML = ic("arrow", 13) + " BACK";
+    bb.style.cssText = "display:none";
+    document.body.appendChild(bb);
+    bb.addEventListener("click", () => {
+      if (NAV_STACK.length >= 2) { NAV_STACK.pop(); const prev = NAV_STACK.pop() || "/"; location.hash = prev; }
+      else location.hash = "/";
+    });
+  }
+  bb.querySelector("svg").style.transform = "rotate(180deg)";
+  const show = !ROOT_PATHS.has(path);
+  bb.style.display = show ? "inline-flex" : "none";
+  bb.classList.toggle("show", show);
+}
 function routeLine() {
   let l = $("#routeline");
   if (!l) { l = document.createElement("div"); l.id = "routeline"; document.body.appendChild(l); }
@@ -1483,6 +1634,9 @@ async function route() {
   routeLine();
   const raw = (location.hash || "#/").slice(1);
   const [path, qs] = raw.split("?");
+  NAV_STACK.push(path === "" ? "/" : path);
+  if (NAV_STACK.length > 40) NAV_STACK.shift();
+  updateBackBtn(path === "" ? "/" : path);
   const query = new URLSearchParams(qs || "");
   const app = $("#app");
   window.scrollTo(0, 0);
@@ -1494,7 +1648,9 @@ async function route() {
   try {
     let html;
     const parts = path.split("/").filter(Boolean);
-    if (parts.length === 1 && parts[0] === "discover") {
+    if (parts.length === 1 && parts[0] === "attempts") {
+      html = await viewAttempts();
+    } else if (parts.length === 1 && parts[0] === "discover") {
       html = await viewDiscover(query);
     } else if (parts.length === 3 && parts[0] === "journey") {
       html = await viewJourney(parts[1], parts[2]);

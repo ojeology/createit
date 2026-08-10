@@ -111,6 +111,15 @@ CREATE TABLE IF NOT EXISTS notifications(id INTEGER PRIMARY KEY, user_id INTEGER
   text TEXT, link TEXT, read INTEGER DEFAULT 0, created_at TEXT);
 """
 
+RATINGS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS ratings(id INTEGER PRIMARY KEY, user_id INTEGER, video_id INTEGER,
+  score INTEGER NOT NULL, created_at TEXT, UNIQUE(user_id, video_id));
+CREATE TABLE IF NOT EXISTS attempt_saves(id INTEGER PRIMARY KEY, user_id INTEGER, challenge_id INTEGER,
+  created_at TEXT, UNIQUE(user_id, challenge_id));
+CREATE INDEX IF NOT EXISTS idx_ratings_video ON ratings(video_id);
+CREATE INDEX IF NOT EXISTS idx_saves_user ON attempt_saves(user_id);
+"""
+
 INDEXES = """
 CREATE INDEX IF NOT EXISTS idx_videos_ch ON videos(challenge_id, kind);
 CREATE INDEX IF NOT EXISTS idx_videos_user ON videos(user_id, kind);
@@ -125,6 +134,7 @@ CREATE INDEX IF NOT EXISTS idx_follows_src ON follows(follower_id);
 
 def seed_if_empty():
     db().executescript(SCHEMA)
+    db().executescript(RATINGS_SCHEMA)
     db().executescript(INDEXES)
     # migrations (safe to re-run)
     try: q("ALTER TABLE challenges ADD COLUMN sponsor TEXT")
@@ -278,6 +288,10 @@ def videos_pub(rows, me=None):
     vids = [r["id"] for r in rows]
     ph = ",".join("?" * len(vids))
     like_c = {a: b for a, b in qa(f"SELECT video_id, COUNT(*) FROM likes WHERE video_id IN ({ph}) GROUP BY video_id", tuple(vids))}
+    rate_c = {a: (round(b, 1), c) for a, b, c in qa(f"SELECT video_id, AVG(score), COUNT(*) FROM ratings WHERE video_id IN ({ph}) GROUP BY video_id", tuple(vids))}
+    mine_rate = {}
+    if me_id:
+        mine_rate = {a: b for a, b in qa(f"SELECT video_id, score FROM ratings WHERE user_id=? AND video_id IN ({ph})", (me_id, *vids))}
     com_c = {a: b for a, b in qa(f"SELECT video_id, COUNT(*) FROM comments WHERE video_id IN ({ph}) GROUP BY video_id", tuple(vids))}
     liked = set()
     if me_id:
@@ -289,6 +303,11 @@ def videos_pub(rows, me=None):
         phc = ",".join("?" * len(ch_ids))
         chs = {r["id"]: {"id": r["id"], "code": r["code"], "title": r["title"], "stage": r["stage"]}
                for r in qa(f"SELECT id, code, title, stage FROM challenges WHERE id IN ({phc})", tuple(ch_ids))}
+        saved_ch = set()
+        if me_id:
+            saved_ch = {x[0] for x in qa(f"SELECT challenge_id FROM attempt_saves WHERE user_id=? AND challenge_id IN ({phc})", (me_id, *ch_ids))}
+        for cid2, c2 in chs.items():
+            c2["mine"] = {"saved": cid2 in saved_ch}
     out = []
     for r in rows:
         out.append({
@@ -299,6 +318,8 @@ def videos_pub(rows, me=None):
             "owner": owners.get(r["user_id"]),
             "challenge": chs.get(r["challenge_id"]),
             "likes": like_c.get(r["id"], 0), "liked": r["id"] in liked, "comments": com_c.get(r["id"], 0),
+            "rating": {"avg": rate_c.get(r["id"], (0, 0))[0], "count": rate_c.get(r["id"], (0, 0))[1],
+                       "mine": mine_rate.get(r["id"], 0)},
         })
     return out
 
@@ -332,8 +353,9 @@ def challenges_pub(rows, me=None):
         origs = {vid: v for vid, v in zip(orig_ids, videos_pub([origs[i] for i in orig_ids], me))}
     uid_needed = {r["creator_id"] for r in rows} | {r["champion_id"] for r in rows if r["champion_id"]} | {t[0] for t in tops.values()}
     umap = users_pub_map(uid_needed)
-    mine_stats, mine_beat = {}, set()
+    mine_stats, mine_beat, mine_saved = {}, set(), set()
     if me_id:
+        mine_saved = {x[0] for x in qa(f"SELECT challenge_id FROM attempt_saves WHERE user_id=? AND challenge_id IN ({ph})", (me_id, *cids))}
         for x in qa(f"""SELECT challenge_id, COUNT(*) n, MAX(score) best, MAX(CASE WHEN score>=100 THEN 1 ELSE 0 END) qual
                         FROM videos WHERE user_id=? AND kind='recreate' AND challenge_id IN ({ph}) GROUP BY challenge_id""", (me_id, *cids)):
             mine_stats[x[0]] = {"n": x[1], "best": x[2], "qual": x[3]}
@@ -353,7 +375,7 @@ def challenges_pub(rows, me=None):
             ms = mine_stats.get(r["id"], {"n": 0, "best": None, "qual": 0})
             beat_in = r["id"] in mine_beat
             mine = {"attempts": ms["n"], "best": ms["best"], "qualified": bool(ms["qual"]),
-                    "beatit_submitted": beat_in,
+                    "beatit_submitted": beat_in, "saved": r["id"] in mine_saved,
                     "can_recreate": r["stage"] == "recreate_it",
                     "can_beatit": r["stage"] in ("recreate_closed", "beat_it") and bool(ms["qual"]) and not beat_in}
         out.append({
@@ -558,10 +580,13 @@ def profile(username):
     attempts = videos_pub(qa("SELECT * FROM videos WHERE user_id=? AND kind='recreate' ORDER BY id DESC LIMIT 60", (u["id"],)), me)
     records = [{"challenge": {"id": c["id"], "code": c["code"], "title": c["title"]}, "score": c["champion_score"],
                 "unbeaten_days": days_ago(c["champion_at"])} for c in qa("SELECT * FROM challenges WHERE champion_id=? ORDER BY champion_at DESC", (u["id"],))]
+    created = challenges_pub(qa("SELECT * FROM challenges WHERE creator_id=? ORDER BY id DESC", (u["id"],)), me)
+    beatit_list = videos_pub(qa("SELECT * FROM videos WHERE user_id=? AND kind='beatit' ORDER BY id DESC", (u["id"],)), me)
     return jsonify(user=pub, stats={"champion": len(champs), "completed": completed, "attempts": attempts,
                                      "creations": creations, "beatit": beatit},
                    champion_of=[{"id": c["id"], "code": c["code"], "title": c["title"], "score": c["champion_score"]} for c in champs],
-                   journeys=journeys, creations=creation_list, uploads=uploads, attempts=attempts, records=records)
+                   journeys=journeys, creations=creation_list, uploads=uploads, attempts=attempts, records=records,
+                   created_challenges=created, beatit_list=beatit_list)
 
 @app.post("/api/user/socials")
 @require_user
@@ -658,14 +683,52 @@ def upload(u):
             q("UPDATE challenges SET stage='beat_it' WHERE id=?", (cid,))
         commit()
         return jsonify(ok=True, video_id=vid, message="Final submission locked in. One shot. Make it count.")
-    # creation / self-nomination
+    # creation / self-nomination — goes live in Discover immediately; scouts review it for challenge selection
     nominated = 1 if request.form.get("nominated") else 0
-    q("INSERT INTO videos (user_id, kind, title, description, file, status, nominated, created_at) VALUES (?,?,?,?,?,'pending',?,?)",
+    q("INSERT INTO videos (user_id, kind, title, description, file, status, nominated, created_at) VALUES (?,?,?,?,?,'approved',?,?)",
       (u["id"], "creation", title or "Untitled creation", desc, fname, nominated, now_iso()))
     vid = q1("SELECT last_insert_rowid() id")["id"]
-    notify(u["id"], "review", f"“{title or 'Your creation'}” was submitted and is under review by CreateIt.", "/notifications")
+    notify(u["id"], "review", f"“{title or 'Your creation'}” is live in Discover. CreateIt scouts are watching.", "/discover")
     commit()
-    return jsonify(ok=True, video_id=vid, message="Submitted to CreateIt for review. If it's special enough, it becomes a challenge.")
+    return jsonify(ok=True, video_id=vid, message="Your creation is live in Discover — CreateIt scouts are watching.")
+
+# ---------------------------------------------------------------- rating + attempts
+@app.post("/api/video/<int:vid>/rate")
+@require_user
+def rate_video(u, vid):
+    r = get_video(vid)
+    if not r: return jsonify(error="Not found"), 404
+    d = request.get_json(silent=True) or {}
+    try: sc = int(d.get("score"))
+    except (TypeError, ValueError): return jsonify(error="Bad score"), 400
+    if not (1 <= sc <= 5): return jsonify(error="Score must be 1–5"), 400
+    q("INSERT INTO ratings (user_id, video_id, score, created_at) VALUES (?,?,?,?) ON CONFLICT(user_id, video_id) DO UPDATE SET score=excluded.score",
+      (u["id"], vid, sc, now_iso()))
+    commit()
+    st = q1("SELECT AVG(score) a, COUNT(*) c FROM ratings WHERE video_id=?", (vid,))
+    return jsonify(ok=True, mine=sc, avg=round(st["a"] or 0, 1), count=st["c"])
+
+@app.post("/api/challenge/<int:cid>/attempt-toggle")
+@require_user
+def attempt_toggle(u, cid):
+    ch = get_challenge(cid)
+    if not ch: return jsonify(error="This challenge has left the Arena."), 404
+    if q1("SELECT 1 FROM attempt_saves WHERE user_id=? AND challenge_id=?", (u["id"], cid)):
+        q("DELETE FROM attempt_saves WHERE user_id=? AND challenge_id=?", (u["id"], cid)); saved = False
+    else:
+        q("INSERT INTO attempt_saves (user_id, challenge_id, created_at) VALUES (?,?,?)", (u["id"], cid, now_iso())); saved = True
+    commit()
+    return jsonify(saved=saved, count=q1("SELECT COUNT(*) c FROM attempt_saves WHERE challenge_id=?", (cid,))["c"])
+
+@app.get("/api/attempts")
+@require_user
+def my_attempts(u):
+    rows = qa("""SELECT c.*, EXISTS(SELECT 1 FROM videos v WHERE v.challenge_id=c.id AND v.user_id=? AND v.kind IN ('recreate','beatit')) submitted
+                 FROM attempt_saves s JOIN challenges c ON c.id=s.challenge_id WHERE s.user_id=? ORDER BY s.id DESC""", (u["id"], u["id"]))
+    out = challenges_pub(rows, u)
+    for c, row in zip(out, rows):
+        c["submitted"] = bool(row["submitted"])
+    return jsonify(challenges=out)
 
 # ---------------------------------------------------------------- discover feed
 @app.get("/api/discover")
@@ -692,8 +755,12 @@ def discover_feed():
     elif f == "champions":
         rows = qa("SELECT * FROM videos WHERE kind='beatit' AND score IS NOT NULL ORDER BY score DESC LIMIT ?", (limit,))
     else:
-        rows = qa("""SELECT v.*, (SELECT COUNT(*) FROM likes l WHERE l.video_id=v.id) lc FROM videos v
-                     WHERE v.status='approved' ORDER BY (lc*2 + COALESCE(v.score,0)) DESC, v.id DESC LIMIT ?""", (limit,))
+        rows = qa("""SELECT v.*, (SELECT COUNT(*) FROM likes l WHERE l.video_id=v.id) lc,
+                       (SELECT COUNT(*) FROM comments cm WHERE cm.video_id=v.id) cc,
+                       (SELECT COUNT(*) FROM ratings rt WHERE rt.video_id=v.id) rc,
+                       (SELECT COALESCE(AVG(r2.score),0) FROM ratings r2 WHERE r2.video_id=v.id) ra
+                     FROM videos v WHERE v.status='approved'
+                     ORDER BY (COALESCE(v.views,0) + lc*3 + cc*4 + rc*6 + ra*rc*2) DESC, v.id DESC LIMIT ?""", (limit,))
     return jsonify(videos=videos_pub(rows, me), filter=f)
 
 # ---------------------------------------------------------------- leaderboard & records
@@ -722,7 +789,9 @@ def leaderboard():
 @require_admin
 def admin_queue(u):
     me = current_user()
-    pending = videos_pub(qa("SELECT * FROM videos WHERE status='pending' ORDER BY id DESC"), me)
+    pending = videos_pub(qa("""SELECT * FROM videos WHERE status='pending'
+                 OR (kind='creation' AND status='approved' AND id NOT IN (SELECT COALESCE(original_video_id,0) FROM challenges))
+                 ORDER BY id DESC"""), me)
     unscored = videos_pub(qa("SELECT * FROM videos WHERE kind IN ('recreate','beatit') AND score IS NULL AND status='approved' ORDER BY id DESC"), me)
     stats = {"users": q1("SELECT COUNT(*) c FROM users")["c"],
              "videos": q1("SELECT COUNT(*) c FROM videos")["c"],
