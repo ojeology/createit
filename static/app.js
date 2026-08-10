@@ -477,6 +477,7 @@ document.addEventListener("click", async e => {
   const vid = el.dataset.vid;
   try {
     if (act === "watch" || act === "open-video") {
+      if (el !== e.target && e.target.closest("[data-noact]")) return;
       e.stopPropagation();
       if (typeof viewerFromEl === "function" && viewerFromEl(el)) return;
       openPlayer(vid);
@@ -685,7 +686,7 @@ async function viewHome() {
         <span class="hero-flag">${ic("crown", 12)} CREATEIT OF THE WEEK · ${esc(h.code)}</span>
         ${stagePill(h.stage)}
       </div>
-      <div class="hero-info">
+      <div class="hero-info" data-noact="1">
         <div class="hi-title">${esc(h.title)}</div>
         <div class="hi-sub">
           <span class="ds-owner" data-nav="/user/${h.creator.username}">${avatar(h.creator, "sm")} <b>@${esc(h.creator.username)}</b></span>

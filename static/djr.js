@@ -115,7 +115,7 @@ function djArmPager() {
   track.dataset.pagered = "1";
   let tapX = 0, tapY = 0;
   track.addEventListener("pointerdown", e => {
-    if (DG.animating) return;
+    if (DG.animating) { if (DG.finish) DG.finish(); else return; }
     DG.down = true; DG.sx = e.clientX; DG.sy = e.clientY; tapX = e.clientX; tapY = e.clientY;
     DG.dx = 0; DG.t0 = performance.now(); DG.axis = null;
     djSetX(-djTrackW(), false);
@@ -172,10 +172,10 @@ function djGo(dir) {
     }
     djCenter(); djReplay(); return;
   }
-  if (DJ.idx > 0) djGoAnimated(-1); else djCenter();
+  if (DJ.idx > 0) { djPaintWindow(); djGoAnimated(-1); } else djCenter();
 }
 function djGoAnimated(dir) {
-  if (DG.animating) { djCenter(); return; }
+  if (DG.animating) { if (DG.finish) DG.finish(); else djCenter(); return; }
   const W = djTrackW();
   const valid = dir === 1 ? !!DJ.videos[DJ.idx + 1] : DJ.idx > 0;
   if (!valid) { djCenter(); return; }
@@ -184,6 +184,7 @@ function djGoAnimated(dir) {
   let done = false;
   const after = () => {
     if (done) return; done = true;
+    DG.finish = null;
     DJ.idx += dir;
     if (dir === 1) djEnsureNext();
     djPaintWindow();
@@ -191,8 +192,9 @@ function djGoAnimated(dir) {
     DG.animating = false;
     djActivateCurrent();
   };
+  DG.finish = after;
   djWin().addEventListener("transitionend", after, { once: true });
-  setTimeout(after, 360);
+  setTimeout(after, 320);
 }
 
 // ---------------- slots ----------------
@@ -447,11 +449,11 @@ function djPaintRate(n) {
   const num = document.getElementById("drp-num");
   const word = document.getElementById("drp-word");
   const bars = document.getElementById("drp-bars");
-  if (num) num.textContent = n;
+  if (num) { num.textContent = n; num.classList.remove("pop"); void num.offsetWidth; num.classList.add("pop"); }
   if (word) word.textContent = DJ_RATE_WORDS[n] || "";
   if (bars) [...bars.children].forEach((b, i) => b.classList.toggle("on", i < n));
 }
-function djHaptic() { try { if (navigator.vibrate) navigator.vibrate(9); } catch (e) {} }
+function djHaptic() { try { if (navigator.vibrate) navigator.vibrate(14); } catch (e) {} }
 function djOpenRate() {
   const v = DJ.videos[DJ.idx];
   if (!v) return;
@@ -471,8 +473,8 @@ function djArmRateGestures() {
     sy = e.clientY; startVal = DJ.rateVal; moved = false;
     const move = ev => {
       const dy = sy - ev.clientY;                     // up = positive
-      if (Math.abs(dy) > 10) moved = true;
-      const steps = Math.round(dy / 44);
+      if (Math.abs(dy) > 6) moved = true;
+      const steps = Math.round(dy / 30);              // tighter steps = sharper response
       const n = Math.max(1, Math.min(5, startVal + steps));
       if (n !== DJ.rateVal) { djPaintRate(n); djHaptic(); }
     };

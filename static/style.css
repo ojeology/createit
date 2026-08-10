@@ -2571,3 +2571,9 @@ body:has(#djr) #backbtn, body:has(.player) #backbtn{display:none !important}
 .drp-bars i:nth-child(1){height:16%}.drp-bars i:nth-child(2){height:34%}.drp-bars i:nth-child(3){height:52%}.drp-bars i:nth-child(4){height:74%}.drp-bars i:nth-child(5){height:100%}
 .drp-bars i.on{background:var(--grad-brand);box-shadow:0 0 16px rgba(225,78,42,.4)}
 .drp-hint{text-align:center;font-family:var(--mono);font-size:8.5px;letter-spacing:.24em;color:#5c6572;margin-bottom:12px}
+
+/* v26 — sharper rating bars + number pop */
+.drp-bars i{transition:height .11s cubic-bezier(.2,1,.3,1), background .11s ease, box-shadow .11s ease}
+.drp-val b{transition:transform .1s ease}
+.drp-val b.pop{animation:drp-pop .22s cubic-bezier(.2,1.6,.4,1)}
+@keyframes drp-pop{0%{transform:scale(1)}45%{transform:scale(1.22)}100%{transform:scale(1)}}

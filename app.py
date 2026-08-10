@@ -215,16 +215,16 @@ def seed_if_empty():
         return q1("SELECT id FROM users WHERE username=?", (un,))["id"]
     U = {}
     U["admin"] = user("admin", "CreateIt HQ", "🛡️", "#F5C518", "Official CreateIt evaluation team.", 1)
-    U["alex"]  = user("alex",  "Alex Okafor",  "🎩", "#FF4D2E", "Street footballer. I made the trick nobody could copy.")
-    U["sarah"] = user("sarah", "Sarah Adeyemi","🦋", "#22D3A5", "53 attempts. One champion. The journey is the story.")
-    U["david"] = user("david", "David Kim",    "🚀", "#5B8CFF", "I recreate everything. Beat me if you can.")
-    U["mike"]  = user("mike",  "Mike Eze",     "⚡", "#FFB300", "98% is not enough.")
-    U["john"]  = user("john",  "John Danladi", "🎯", "#FF6FB2", "Precision is a habit.")
-    U["zoe"]   = user("zoe",   "Zoe Martins",  "🌙", "#9D6BFF", "Dancer. Creator of the Moonwalk Ladder.")
-    U["efe"]   = user("efe",   "Efe Ogbe",     "🧩", "#3ECF8E", "Skater. Kickflips are my language.")
-    U["nina"]  = user("nina",  "Nina Bello",   "🌶️", "#FF7849", "Chef. I cook fast and I recreate faster.")
-    U["tobi"]  = user("tobi",  "Tobi Akin",    "🎲", "#4CC9F0", "Bottle flip scientist.")
-    U["kofi"]  = user("kofi",  "Kofi Mensah",  "🥁", "#F4A259", "Drummer with too many hands.")
+    U["alex"]  = user("alex",  "Alex Okafor",  "😎", "#FF4D2E", "Street footballer. I made the trick nobody could copy.")
+    U["sarah"] = user("sarah", "Sarah Adeyemi","🤩", "#22D3A5", "53 attempts. One champion. The journey is the story.")
+    U["david"] = user("david", "David Kim",    "😄", "#5B8CFF", "I recreate everything. Beat me if you can.")
+    U["mike"]  = user("mike",  "Mike Eze",     "😤", "#FFB300", "98% is not enough.")
+    U["john"]  = user("john",  "John Danladi", "🙂", "#FF6FB2", "Precision is a habit.")
+    U["zoe"]   = user("zoe",   "Zoe Martins",  "💃", "#9D6BFF", "Dancer. Creator of the Moonwalk Ladder.")
+    U["efe"]   = user("efe",   "Efe Ogbe",     "🤓", "#3ECF8E", "Skater. Kickflips are my language.")
+    U["nina"]  = user("nina",  "Nina Bello",   "😜", "#FF7849", "Chef. I cook fast and I recreate faster.")
+    U["tobi"]  = user("tobi",  "Tobi Akin",    "🥳", "#4CC9F0", "Bottle flip scientist.")
+    U["kofi"]  = user("kofi",  "Kofi Mensah",  "😏", "#F4A259", "Drummer with too many hands.")
 
     def vid(uid, kind, file, title, desc="", status="approved", score=None, attempt=None, ch=None, nominated=0, ago=0):
         q("INSERT INTO videos (user_id, kind, challenge_id, title, description, file, status, score, attempt_no, nominated, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
@@ -469,7 +469,7 @@ def register():
     if len(pw) < 6: return jsonify(error="Password must be at least 6 characters"), 400
     if q1("SELECT 1 FROM users WHERE username=?", (un,)): return jsonify(error="Username already taken"), 400
     q("INSERT INTO users (username, display_name, pw, bio, avatar, color, created_at) VALUES (?,?,?,?,?,?,?)",
-      (un, dn, hash_pw(pw), "", "🌟", secrets.choice(["#FF4D2E", "#22D3A5", "#7C5CFF", "#FFB300", "#5B8CFF", "#FF6FB2"]), now_iso()))
+      (un, dn, hash_pw(pw), "", secrets.choice(["😎","🤩","😊","😄","😇","🙂","🤗","😜","🥳","🤓","😏","😌","🕺","💃"]), secrets.choice(["#FF4D2E", "#22D3A5", "#7C5CFF", "#FFB300", "#5B8CFF", "#FF6FB2"]), now_iso()))
     uid = q1("SELECT id FROM users WHERE username=?", (un,))["id"]
     tok = secrets.token_hex(24)
     q("INSERT INTO sessions VALUES (?,?,?)", (tok, uid, now_iso()))
