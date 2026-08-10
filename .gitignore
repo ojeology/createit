@@ -22,3 +22,11 @@ mobile/android/.gradle/
 mobile/android/build/
 mobile/android/app/build/
 mobile/android/local.properties
+.buildtools/
+.android/
+createit-debug.apk
+.android/
+createit-debug.apk
+.github/
+mobile/android/local.properties
+mobile/android/gradle.properties
