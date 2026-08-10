@@ -111,6 +111,16 @@ CREATE TABLE IF NOT EXISTS notifications(id INTEGER PRIMARY KEY, user_id INTEGER
   text TEXT, link TEXT, read INTEGER DEFAULT 0, created_at TEXT);
 """
 
+DISCOVERY_SCHEMA = """
+CREATE TABLE IF NOT EXISTS categories(id INTEGER PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL,
+  parent TEXT, ord INTEGER DEFAULT 0);
+CREATE TABLE IF NOT EXISTS video_categories(video_id INTEGER, category_id INTEGER, UNIQUE(video_id, category_id));
+CREATE TABLE IF NOT EXISTS challenge_categories(challenge_id INTEGER, category_id INTEGER, UNIQUE(challenge_id, category_id));
+CREATE TABLE IF NOT EXISTS journeys(id INTEGER PRIMARY KEY, challenge_id INTEGER UNIQUE, title TEXT, tagline TEXT, created_at TEXT);
+CREATE INDEX IF NOT EXISTS idx_vc_cat ON video_categories(category_id);
+CREATE INDEX IF NOT EXISTS idx_cc_cat ON challenge_categories(category_id);
+"""
+
 RATINGS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS ratings(id INTEGER PRIMARY KEY, user_id INTEGER, video_id INTEGER,
   score INTEGER NOT NULL, created_at TEXT, UNIQUE(user_id, video_id));
@@ -132,10 +142,52 @@ CREATE INDEX IF NOT EXISTS idx_follows_target ON follows(followee_id);
 CREATE INDEX IF NOT EXISTS idx_follows_src ON follows(follower_id);
 """
 
+DISCOVERY_CATS = [
+    ("Sports", "sports", None), ("Football", "football", "sports"), ("Basketball", "basketball", "sports"),
+    ("Tricks", "tricks", "sports"), ("Balance", "balance", "sports"), ("Running", "running", "sports"),
+    ("Food", "food", None), ("Indomie", "indomie", "food"), ("Rice", "rice", "food"),
+    ("Cooking", "cooking", "food"), ("Baking", "baking", "food"),
+    ("Skills", "skills", None), ("Dance", "dance", "skills"), ("Art", "art", "skills"),
+    ("Music", "music", "skills"), ("Memory", "memory", "skills"), ("Speed", "speed", "skills"),
+    ("Precision", "precision", "skills"),
+]
+
+def seed_discovery():
+    for i, (name, slug, parent) in enumerate(DISCOVERY_CATS):
+        q("INSERT OR IGNORE INTO categories (name, slug, parent, ord) VALUES (?,?,?,?)", (name, slug, parent, i))
+    commit()
+    cats = {r["slug"]: r["id"] for r in qa("SELECT id, slug FROM categories")}
+    file_cats = {
+        "c1_original": ["football", "tricks"], "c1_sarah%": ["football", "tricks"], "c1_david": ["football", "tricks"],
+        "c1_beat%": ["football", "tricks"], "c2_%": ["dance"], "c3_%": ["tricks", "speed"],
+        "pend_nina": ["cooking", "rice", "indomie"], "pend_tobi": ["basketball"], "disc_kofi": ["dance", "music"],
+    }
+    for v in qa("SELECT id, file FROM videos"):
+        stem = os.path.splitext(v["file"])[0]
+        for pat, slugs in file_cats.items():
+            m = (stem == pat.rstrip("%")) if pat.endswith("%") else (stem == pat)
+            if not m and pat.endswith("%"): m = stem.startswith(pat.rstrip("%"))
+            if m:
+                for sl in slugs:
+                    if sl in cats:
+                        q("INSERT OR IGNORE INTO video_categories (video_id, category_id) VALUES (?,?)", (v["id"], cats[sl]))
+    ch_cats = {1: ["football", "tricks"], 2: ["dance"], 3: ["tricks", "speed"]}
+    for cid, slugs in ch_cats.items():
+        for sl in slugs:
+            if sl in cats:
+                q("INSERT OR IGNORE INTO challenge_categories (challenge_id, category_id) VALUES (?,?)", (cid, cats[sl]))
+    if not q1("SELECT 1 FROM journeys") and q1("SELECT 1 FROM challenges WHERE stage='champion'"):
+        ch = q1("SELECT * FROM challenges WHERE stage='champion' ORDER BY id LIMIT 1")
+        q("INSERT OR IGNORE INTO journeys (challenge_id, title, tagline, created_at) VALUES (?,?,?,?)",
+          (ch["id"], f"THE JOURNEY OF {ch['code']}", "From first attempt to champion — the official CreateIt story.", now_iso()))
+    commit()
+
 def seed_if_empty():
     db().executescript(SCHEMA)
     db().executescript(RATINGS_SCHEMA)
+    db().executescript(DISCOVERY_SCHEMA)
     db().executescript(INDEXES)
+    seed_discovery()
     # migrations (safe to re-run)
     try: q("ALTER TABLE challenges ADD COLUMN sponsor TEXT")
     except sqlite3.OperationalError: pass
@@ -213,8 +265,8 @@ def seed_if_empty():
     vid(U["nina"],  "beatit", "c3_beat_nina.mp4",  "Beat It — Final Submission", "Added a late shove. Clean landing.", score=99, ch=C3, ago=1)
 
     # ---- Pending submissions (admin queue) + Discover ----
-    vid(U["nina"], "creation", "pend_nina.mp4", "Fire Jollof in 30 Seconds", "Full jollof plating in half a minute. I believe this deserves a challenge.", status="pending", nominated=1, ago=1)
-    vid(U["tobi"], "creation", "pend_tobi.mp4", "The Half-Court Shot", "Off the dribble, from the logo, nothing but net. I believe this deserves a challenge.", status="pending", ago=1)
+    vid(U["nina"], "creation", "pend_nina.mp4", "Fire Jollof in 30 Seconds", "Full jollof plating in half a minute. I believe this deserves a challenge.", status="approved", nominated=1, ago=1)
+    vid(U["tobi"], "creation", "pend_tobi.mp4", "The Half-Court Shot", "Off the dribble, from the logo, nothing but net. I believe this deserves a challenge.", status="approved", ago=1)
     vid(U["kofi"], "creation", "disc_kofi.mp4", "The Midnight Groove", "Viral clip — CreateIt scouts flagged this as exceptional.", status="approved", ago=2)
 
     # ---- Social graph ----
@@ -691,6 +743,90 @@ def upload(u):
     notify(u["id"], "review", f"“{title or 'Your creation'}” is live in Discover. CreateIt scouts are watching.", "/discover")
     commit()
     return jsonify(ok=True, video_id=vid, message="Your creation is live in Discover — CreateIt scouts are watching.")
+
+# ---------------------------------------------------------------- discovery architecture
+@app.get("/api/categories")
+def categories_list():
+    rows = qa("SELECT * FROM categories ORDER BY ord")
+    out, groups = [], {}
+    for r in rows:
+        item = {"id": r["id"], "name": r["name"], "slug": r["slug"], "parent": r["parent"],
+                "count": q1("SELECT COUNT(*) c FROM video_categories WHERE category_id=?", (r["id"],))["c"]}
+        out.append(item)
+        if not r["parent"]: groups[r["slug"]] = {"group": item, "children": []}
+    for item in out:
+        if item["parent"] and item["parent"] in groups:
+            groups[item["parent"]]["children"].append(item)
+    return jsonify(categories=out, groups=list(groups.values()))
+
+@app.get("/api/category/<slug>")
+def category_page(slug):
+    me = current_user()
+    cat = q1("SELECT * FROM categories WHERE slug=?", (slug,))
+    if not cat: return jsonify(error="This topic has left the Arena."), 404
+    vids = videos_pub(qa("""SELECT v.* FROM videos v JOIN video_categories vc ON vc.video_id=v.id
+                            WHERE vc.category_id=? AND v.status='approved' ORDER BY v.id DESC LIMIT 24""", (cat["id"],)), me)
+    chs = challenges_pub(qa("""SELECT c.* FROM challenges c JOIN challenge_categories cc ON cc.challenge_id=c.id
+                               WHERE cc.category_id=? ORDER BY c.id DESC""", (cat["id"],)), me)
+    return jsonify(category={"id": cat["id"], "name": cat["name"], "slug": cat["slug"], "parent": cat["parent"]},
+                   videos=vids, challenges=chs)
+
+@app.get("/api/search")
+def search_all():
+    me = current_user()
+    qstr = (request.args.get("q") or "").strip()
+    if not qstr: return jsonify(videos=[], challenges=[], creators=[], categories=[], journeys=[])
+    like = f"%{qstr}%"
+    vids = videos_pub(qa("""SELECT DISTINCT v.* FROM videos v
+        JOIN users u ON u.id=v.user_id
+        LEFT JOIN video_categories vc ON vc.video_id=v.id
+        LEFT JOIN categories ct ON ct.id=vc.category_id
+        WHERE v.status='approved' AND (v.title LIKE ? OR v.description LIKE ? OR u.username LIKE ? OR u.display_name LIKE ? OR ct.name LIKE ?)
+        ORDER BY v.id DESC LIMIT 12""", (like, like, like, like, like)), me)
+    chs = challenges_pub(qa("""SELECT DISTINCT c.* FROM challenges c
+        LEFT JOIN challenge_categories cc ON cc.challenge_id=c.id
+        LEFT JOIN categories ct ON ct.id=cc.category_id
+        WHERE c.title LIKE ? OR c.code LIKE ? OR c.description LIKE ? OR ct.name LIKE ?
+        ORDER BY c.id DESC LIMIT 8""", (like, like, like, like)), me)
+    creators = [user_pub(r) for r in qa("SELECT * FROM users WHERE username LIKE ? OR display_name LIKE ? OR bio LIKE ? LIMIT 8", (like, like, like))]
+    cats = [{"id": r["id"], "name": r["name"], "slug": r["slug"], "parent": r["parent"]} for r in qa("SELECT * FROM categories WHERE name LIKE ? LIMIT 8", (like,))]
+    js = [{"id": r["id"], "title": r["title"], "tagline": r["tagline"], "challenge_id": r["challenge_id"]}
+          for r in qa("SELECT * FROM journeys WHERE title LIKE ? OR tagline LIKE ? LIMIT 4", (like, like))]
+    return jsonify(videos=vids, challenges=chs, creators=creators, categories=cats, journeys=js, q=qstr)
+
+@app.get("/api/journeys")
+def journeys_list():
+    out = []
+    for r in qa("SELECT * FROM journeys ORDER BY id DESC"):
+        ch = get_challenge(r["challenge_id"])
+        if not ch: continue
+        n = q1("SELECT COUNT(*) c FROM videos WHERE challenge_id=? AND kind IN ('recreate','beatit')", (ch["id"],))["c"]
+        out.append({"id": r["id"], "title": r["title"], "tagline": r["tagline"], "created_at": r["created_at"],
+                    "challenge": {"id": ch["id"], "code": ch["code"], "title": ch["title"], "stage": ch["stage"]},
+                    "moments": n + 2})
+    upcoming = [{"challenge": {"id": c["id"], "code": c["code"], "title": c["title"], "stage": c["stage"]}}
+                for c in qa("SELECT * FROM challenges WHERE stage IN ('beat_it','recreate_closed') ORDER BY id DESC LIMIT 2")]
+    return jsonify(journeys=out, upcoming=upcoming)
+
+@app.get("/api/journey-story/<int:jid>")
+def journey_story(jid):
+    me = current_user()
+    r = q1("SELECT * FROM journeys WHERE id=?", (jid,))
+    if not r: return jsonify(error="This story has left the Arena."), 404
+    ch = get_challenge(r["challenge_id"])
+    champ_uid = ch["champion_id"]
+    arc_rows = qa("SELECT * FROM videos WHERE challenge_id=? AND kind='recreate' AND user_id=? ORDER BY attempt_no", (ch["id"], champ_uid))
+    if not arc_rows:
+        arc_rows = qa("SELECT * FROM videos WHERE challenge_id=? AND kind='recreate' AND score IS NOT NULL ORDER BY score DESC LIMIT 6", (ch["id"],))
+    beat_rows = qa("SELECT * FROM videos WHERE challenge_id=? AND kind='beatit' ORDER BY COALESCE(score,0) DESC", (ch["id"],))
+    orig = get_video(ch["original_video_id"])
+    champ_vid = get_video(ch["champion_video_id"]) if ch["champion_video_id"] else None
+    return jsonify(journey={"id": r["id"], "title": r["title"], "tagline": r["tagline"]},
+                   challenge=challenge_pub(ch, me),
+                   original=video_pub(orig, me) if orig else None,
+                   arc=videos_pub(arc_rows, me), beatits=videos_pub(beat_rows, me),
+                   champion_video=video_pub(champ_vid, me) if champ_vid else None,
+                   champion=user_pub(champ_uid) if champ_uid else None)
 
 # ---------------------------------------------------------------- rating + attempts
 @app.post("/api/video/<int:vid>/rate")

@@ -700,19 +700,8 @@ function arenaCard(c) {
   </div>`;
 }
 
-async function viewChallenges(query) {
-  const [cdr, lbr, hdr] = await Promise.allSettled([api("/api/challenges"), api("/api/leaderboard"), api("/api/home")]);
-  const cd = cdr.status === "fulfilled" ? cdr.value : { challenges: [] };
-  const lb = lbr.status === "fulfilled" ? lbr.value : { records: [], champions: [], top: [] };
-  const hd = hdr.status === "fulfilled" ? hdr.value : { discover: [] };
-  const all = cd.challenges;
-  const live = all.filter(c => c.stage === "recreate_it");
-  const hot = [...live].sort((a, b) => b.participants - a.participants || b.attempts_total - a.attempts_total);
-  const beat = all.filter(c => c.stage === "beat_it" || c.stage === "recreate_closed");
-  const champs = all.filter(c => c.stage === "champion");
-  const rec = n => `<span class="sec-n">${n}</span>`;
-  const totalFighters = all.reduce((a, c) => a + c.participants, 0);
-  const emblem = `<svg viewBox="0 0 120 120" fill="none" aria-hidden="true">
+function emblemSVG() {
+  return `<svg viewBox="0 0 120 120" fill="none" aria-hidden="true">
     <defs><linearGradient id="aeg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#17140E"/><stop offset="1" stop-color="#17140E"/></linearGradient></defs>
     <circle class="ae-pulse" cx="60" cy="60" r="46" stroke="#D9331F" stroke-width="1.5"/>
     <circle class="ae2-ring" cx="60" cy="60" r="46" stroke="url(#aeg)" stroke-width="2.5" stroke-linecap="round" transform="rotate(-90 60 60)"/>
@@ -724,39 +713,106 @@ async function viewChallenges(query) {
       <circle cx="60" cy="60" r="5.5" fill="#D9331F"/>
     </g>
   </svg>`;
+}
+
+async function viewChallenges(query) {
+  const [cdr, atr] = await Promise.allSettled([api("/api/challenges"), ME ? api("/api/attempts") : Promise.resolve(null)]);
+  const all = cdr.status === "fulfilled" ? cdr.value.challenges : [];
+  const saved = atr.status === "fulfilled" && atr.value ? atr.value.challenges.length : null;
+  const live = all.filter(c => c.stage === "recreate_it");
+  const beatAll = all.filter(c => c.stage === "beat_it" || c.stage === "recreate_closed");
+  const ready = ME ? beatAll.filter(c => c.mine && c.mine.qualified && !c.mine.beatit_submitted) : [];
   return `
   <div class="arena-head">
-    <div class="arena-emblem">${emblem}</div>
+    <div class="arena-emblem">${emblemSVG()}</div>
     <div class="ah-mid">
-      <div class="ah-tag ah-live"><span class="live-dot"></span> COMPETITION CENTER · ${live.length} LIVE NOW</div>
-      <h1>THE ARENA</h1>
-      <p>Where creations become competitions. Pick your fight.</p>
+      <div class="ah-tag ah-live"><span class="live-dot"></span> COMPETITION CENTER</div>
+      <div class="arena-q">What can you <em>compete</em> in today?</div>
+      <p style="margin-top:9px">Discovery is for watching. The Arena is for doing. Pick your stage.</p>
       <div class="ah-stats">
-        <div class="ah-stat"><span class="hv" data-count="${all.length}">0</span><span class="hk">Challenges</span></div>
-        <div class="ah-stat"><span class="hv" data-count="${totalFighters}">0</span><span class="hk">Fighters</span></div>
-        <div class="ah-stat"><span class="hv" data-count="${lb.records.length}">0</span><span class="hk">Records</span></div>
-        <div class="ah-stat"><span class="hv" data-count="${champs.length}">0</span><span class="hk">Champions</span></div>
+        <div class="ah-stat"><span class="hv">${all.length}</span><span class="hk">Challenges</span></div>
+        <div class="ah-stat"><span class="hv">${live.length}</span><span class="hk">Open now</span></div>
+        <div class="ah-stat"><span class="hv">${beatAll.length}</span><span class="hk">Final stage</span></div>
       </div>
     </div>
   </div>
+  <div class="stage-panels">
+    <button class="stage-panel sp-rec" data-nav="/arena/recreate">
+      <span class="sp-k">STAGE 1 · OPEN TO EVERYONE</span>
+      <span class="sp-name">RECREATE IT</span>
+      <span class="sp-desc">Prove you can reproduce the original creation, exactly as it was done.</span>
+      <span class="sp-meta">${live.length} CHALLENGE${live.length === 1 ? "" : "S"} OPEN ${ic("arrow", 14)}</span>
+    </button>
+    <button class="stage-panel sp-beat" data-nav="/arena/beatit">
+      ${ready.length ? `<span class="sp-flag">YOU'RE READY</span>` : ""}
+      <span class="sp-k">STAGE 2 · QUALIFIED ONLY</span>
+      <span class="sp-name">BEAT IT</span>
+      <span class="sp-desc">Reach 100% first. Then one final submission to surpass the original.</span>
+      <span class="sp-meta">${ME ? ready.length + " READY FOR YOU" : beatAll.length + " IN FINAL STAGE"} ${ic("arrow", 14)}</span>
+    </button>
+  </div>
+  <div class="att-strip" data-nav="/attempts">
+    ${ic("target", 18)} <b>MY ATTEMPTS</b>
+    <span class="att-n">${ME && saved != null ? saved + " SAVED" : "CHALLENGES YOU SAVED TO TRY"} ${ic("arrow", 14)}</span>
+  </div>
+  <div class="arena-explainer">${ic("spark", 16)} <span><b>ATTEMPT</b> saves a challenge for later. <b>SUBMIT ATTEMPT</b> uploads your video. Two different actions — one goal.</span></div>`;
+}
 
-  <div class="sec">${rec("01")}<h2><span class="live-dot"></span> LIVE NOW</h2><span class="sub">accepting recreations</span><span class="sec-rule"></span></div>
-  ${live.length ? `<div class="arena-grid">${live.map(arenaCard).join("")}</div>` : `<div class="empty">Nothing live right now.</div>`}
+async function viewArenaRecreate() {
+  const cdr = await api("/api/challenges").catch(() => ({ challenges: [] }));
+  const live = cdr.challenges.filter(c => c.stage === "recreate_it");
+  return `
+  <div class="page-head">
+    <span class="crumb">ARENA / STAGE 1</span>
+    <h1 class="big-title">RECREATE IT</h1>
+    <div class="meta-row">Watch the original. Practice. Submit your recreation for CreateIt evaluation.</div>
+  </div>
+  ${live.length ? live.map(c => `
+    ${arenaCard(c)}
+    <div class="arena-row-acts">
+      <button class="btn ${c.mine && c.mine.saved ? "btn-teal" : "btn-ghost"}" data-act="attempt-save" data-cid="${c.id}">${ic("target", 13)} <span class="att-lbl">${c.mine && c.mine.saved ? "SAVED" : "ATTEMPT"}</span></button>
+      <button class="btn btn-fire" data-nav="/create?kind=recreate&challenge=${c.id}">${ic("refresh", 13)} SUBMIT ATTEMPT</button>
+    </div>`).join("") : `<div class="empty">${ic("flame", 22)}<br>The Arena is waiting for its first challenge.</div>`}`;
+}
 
-  ${hot.length ? `<div class="sec">${rec("02")}<h2>${ic("flame", 18)} HOT</h2><span class="sub">gaining fighters fast</span><span class="sec-rule"></span></div>
-  <div class="hscroll">${hot.map(c => `<div class="deck-card">${challengeCard(c)}</div>`).join("")}</div>` : ""}
-
-  ${beat.length ? `<div class="sec">${rec("03")}<h2>${ic("zap", 18)} BEAT IT</h2><span class="sub">final stage — one shot each</span><span class="sec-rule"></span></div>
-  <div class="arena-grid">${beat.map(arenaCard).join("")}</div>` : ""}
-
-  ${lb.records.length ? `<div class="sec">${rec("04")}<h2>${ic("disc", 18)} RECORDS</h2><span class="sub">unbeaten marks</span><span class="sec-rule"></span></div>
-  <div class="records-grid">${champs.map(recordCard).join("")}</div>` : ""}
-
-  ${champs.length ? `<div class="sec">${rec("05")}<h2>${ic("crown", 18)} CHAMPIONS</h2><span class="sub">completed competitions</span><span class="sec-rule"></span></div>
-  <div class="arena-grid">${champs.map(arenaCard).join("")}</div>` : ""}
-
-  ${hd.discover.length ? `<div class="sec">${rec("06")}<h2>${ic("globe", 18)} DISCOVER</h2><span class="sub">potential future challenges</span><span class="sec-rule"></span></div>
-  <div class="grid3">${hd.discover.map(v => videoCard(v)).join("")}</div>` : ""}`;
+async function viewArenaBeatit() {
+  if (!ME) return viewAuth("login", "Log in to see the challenges you are ready to beat.");
+  const cdr = await api("/api/challenges").catch(() => ({ challenges: [] }));
+  const beatAll = cdr.challenges.filter(c => c.stage === "beat_it" || c.stage === "recreate_closed");
+  const ready = beatAll.filter(c => c.mine && c.mine.qualified && !c.mine.beatit_submitted);
+  const submitted = beatAll.filter(c => c.mine && c.mine.beatit_submitted);
+  return `
+  <div class="page-head">
+    <span class="crumb">ARENA / STAGE 2</span>
+    <h1 class="big-title">BEAT IT</h1>
+    <div class="meta-row">One final submission. Surpass the original. No retakes.</div>
+  </div>
+  ${ready.length ? `${secHead("", "zap", "READY FOR YOUR FINAL SUBMISSION", "")}
+    ${ready.map(c => `
+    <div class="beat-brief">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+        <span class="ch-code">${esc(c.code)}</span>${stagePill(c.stage)}
+      </div>
+      <div class="ch-title" style="font-family:var(--display);font-weight:900;font-size:21px;margin:9px 0 10px">${esc(c.title)}</div>
+      <div class="bb-line"><span>THE ORIGINAL</span><b>@${esc(c.creator.username)} · BENCHMARK 100%</b></div>
+      <div class="bb-line"><span>CURRENT BEST</span><b class="g">${c.top ? c.top.score + "% · @" + esc(c.top.user.username) : "NO SCORES YET"}</b></div>
+      <div class="bb-line"><span>YOUR STATUS</span><b class="r">QUALIFIED · FINAL SUBMISSION OPEN</b></div>
+      <div style="display:flex;gap:9px;margin-top:14px">
+        <button class="btn btn-fire" style="flex:1" data-nav="/create?kind=beatit&challenge=${c.id}">${ic("zap", 13)} SUBMIT FINAL</button>
+        <button class="btn" data-nav="/challenge/${c.id}">VIEW</button>
+      </div>
+    </div>`).join("")}` : `
+    <div class="arena-explainer" style="margin-top:8px">${ic("zap", 16)} <span>You have no Beat It slots open yet. Pass a challenge's RECREATE IT stage with <b>100%</b> to qualify for the final.</span></div>
+    <div style="margin-top:12px"><button class="btn btn-fire" data-nav="/arena/recreate">GO TO RECREATE IT ${ic("arrow", 13)}</button></div>`}
+  ${submitted.length ? `${secHead("", "target", "YOUR FINAL SUBMISSIONS", "")}
+    ${submitted.map(c => `<div class="beat-brief">
+      <span class="ch-code">${esc(c.code)}</span>
+      <div class="ch-title" style="font-family:var(--display);font-weight:900;font-size:19px;margin:8px 0 6px">${esc(c.title)}</div>
+      <div class="bb-line"><span>STATUS</span><b>SUBMITTED · AWAITING CHAMPION</b></div>
+      <button class="btn" style="margin-top:12px" data-nav="/challenge/${c.id}">VIEW CHALLENGE</button>
+    </div>`).join("")}` : ""}
+  ${beatAll.length ? `${secHead("", "flame", "FINAL-STAGE CHALLENGES", "watch the finalists")}
+    <div class="arena-grid">${beatAll.map(arenaCard).join("")}</div>` : ""}`;
 }
 
 function stageTrack(stage) {
@@ -1185,46 +1241,161 @@ function setupDisc() {
   });
 }
 let DISC_TIMER = null;
-function loadDiscFeed(filter, q) {
-  const feed = $("#disc-feed");
-  if (!feed) return;
-  feed.innerHTML = `<div class="disc-load">SEARCHING THE ARENA…</div>`;
-  const qs = q ? `&q=${encodeURIComponent(q)}` : "";
-  api(`/api/discover?filter=${encodeURIComponent(filter)}&limit=30${qs}`).then(d => {
-    if (!document.contains(feed)) return;
-    delete feed.dataset.ready;
-    feed.innerHTML = d.videos.length
-      ? d.videos.map((v, i) => discSlideHTML(v, i)).join("")
-      : `<div class="disc-load">${q ? `NO RESULTS FOR “${esc(q).toUpperCase()}” — TRY ANOTHER WORD` : "NOTHING HERE YET — BE THE FIRST TO CREATE"}</div>`;
-    setupDisc();
-  }).catch(() => { if (document.contains(feed)) feed.innerHTML = `<div class="disc-load">COULD NOT LOAD — CHECK YOUR CONNECTION</div>`; });
-}
+let DISC_TREND_LIMIT = 6;
+
 async function viewDiscover(query) {
-  const filter = query.get("f") || "trending";
   const q0 = query.get("q") || "";
-  const filters = [["trending", "TRENDING"], ["new", "NEW"], ["challenges", "CHALLENGES"], ["originals", "ORIGINALS"], ["champions", "CHAMPIONS"]];
-  const shell = `<div class="disc-stage">
-    <div class="disc-top">
-      <div class="dt-row1">
-        <button class="icon-btn dt-close" data-nav="/" title="Back">${ic("arrow", 17)}</button>
-        <div class="dt-search">${ic("target", 15)}<input id="disc-search" type="search" placeholder="Search creators, challenges, skills…" value="${esc(q0)}" autocomplete="off"></div>
-      </div>
-      <div class="dt-row2">${filters.map(([k, l]) => `<button class="chip ${k === filter ? "active" : ""}" data-nav="/discover?f=${k}${q0 ? "&q=" + encodeURIComponent(q0) : ""}">${l}</button>`).join("")}</div>
-    </div>
-    <div class="disc-feed" id="disc-feed"><div class="disc-load">· · ·</div></div>
-  </div>`;
+  const shell = `
+  <div class="page-head" style="margin-bottom:10px">
+    <h1 class="big-title">DISCOVERY</h1>
+    <div class="meta-row">What is happening on CreateIt right now.</div>
+  </div>
+  <div class="disc-searchbig">${ic("target", 18)}<input id="disc-search" type="search" placeholder="Search CreateIt — skills, challenges, creators…" value="${esc(q0)}" autocomplete="off"></div>
+  <div class="disc-hint">TRY · FOOTBALL TRICKS · DANCING · COOKING INDOMIE · UNUSUAL SKILLS</div>
+  <div id="disc-body"><div class="loading" style="padding:50px 0"><div class="spinner"></div></div></div>`;
   setTimeout(() => {
     const inp = $("#disc-search");
     if (inp) {
       inp.addEventListener("input", () => {
         clearTimeout(DISC_TIMER);
-        DISC_TIMER = setTimeout(() => loadDiscFeed(filter, inp.value.trim()), 320);
+        DISC_TIMER = setTimeout(() => renderDiscBody(inp.value.trim()), 380);
       });
-      inp.addEventListener("keydown", e => { if (e.key === "Enter") { clearTimeout(DISC_TIMER); loadDiscFeed(filter, inp.value.trim()); } });
+      inp.addEventListener("keydown", e => { if (e.key === "Enter") { clearTimeout(DISC_TIMER); renderDiscBody(inp.value.trim()); } });
     }
-    loadDiscFeed(filter, q0);
+    renderDiscBody(q0);
   }, 0);
   return shell;
+}
+
+async function renderDiscBody(q) {
+  const body = $("#disc-body");
+  if (!body) return;
+  if (q) { renderSearchResults(body, q); return; }
+  DISC_TREND_LIMIT = 6;
+  const [hr, jr, cr] = await Promise.allSettled([api("/api/home"), api("/api/journeys"), api("/api/categories")]);
+  if (!document.contains(body)) return;
+  const h = hr.status === "fulfilled" ? hr.value : { live: [], beat: [] };
+  const jd = jr.status === "fulfilled" ? jr.value : { journeys: [], upcoming: [] };
+  const cats = cr.status === "fulfilled" ? cr.value : { groups: [] };
+  body.innerHTML = `
+    ${(jd.journeys.length || jd.upcoming.length) ? `
+    ${secHead("", "film", "JOURNEYS", "official CreateIt success stories")}
+    <div class="hscroll">
+      ${jd.journeys.map(j => `<div class="jrn-card" data-nav="/story/${j.id}">
+        <span class="jrn-k">OFFICIAL JOURNEY · ${esc(j.challenge.code)}</span>
+        <span class="jrn-t">${esc(j.title)}</span>
+        <span class="jrn-tag">${esc(j.tagline)}</span>
+        <span class="jrn-meta">${j.moments} MOMENTS ${ic("arrow", 12)}</span>
+      </div>`).join("")}
+      ${jd.upcoming.map(u => `<div class="jrn-card jrn-next" data-nav="/challenge/${u.challenge.id}">
+        <span class="jrn-k">IN PRODUCTION · ${esc(u.challenge.code)}</span>
+        <span class="jrn-t">THE NEXT JOURNEY</span>
+        <span class="jrn-tag">${esc(u.challenge.title)} — Beat It is live. The story is being written.</span>
+        <span class="jrn-meta">WATCH THE FINAL ${ic("arrow", 12)}</span>
+      </div>`).join("")}
+    </div>` : ""}
+    ${secHead("", "flame", "TRENDING", "what CreateIt is watching right now")}
+    <div id="disc-trending"><div class="loading" style="padding:26px 0"><div class="spinner"></div></div></div>
+    <div class="load-more"><button class="btn" id="disc-more">LOAD MORE</button></div>
+    ${secHead("", "refresh", "RECREATE IT", "open challenges — prove you can do it")}
+    ${h.live.length ? `<div class="hscroll">${h.live.map(c => challengeCard(c)).join("")}</div>` : `<div class="empty">The Arena is waiting for its first challenge.</div>`}
+    ${h.beat.length ? `${secHead("", "zap", "BEAT IT", "final stage — one shot each")}
+    <div class="hscroll">${h.beat.map(c => challengeCard(c)).join("")}</div>` : ""}
+    ${secHead("", "globe", "EXPLORE", "browse by topic")}
+    ${cats.groups.map(g => `<div class="cat-group">
+      <div class="cat-group-h">${esc(g.group.name)}</div>
+      <div class="cat-chips">
+        <button class="cat-chip" data-nav="/category/${g.group.slug}">ALL ${esc(g.group.name).toUpperCase()}</button>
+        ${g.children.map(c => `<button class="cat-chip" data-nav="/category/${c.slug}">${esc(c.name)}${c.count ? ` <em>${c.count}</em>` : ""}</button>`).join("")}
+      </div>
+    </div>`).join("")}`;
+  const more = $("#disc-more");
+  if (more) more.addEventListener("click", () => { DISC_TREND_LIMIT += 6; loadTrending(); });
+  loadTrending();
+}
+
+async function loadTrending() {
+  const box = $("#disc-trending");
+  if (!box) return;
+  try {
+    const d = await api(`/api/discover?filter=trending&limit=${DISC_TREND_LIMIT}`);
+    if (!document.contains(box)) return;
+    box.innerHTML = d.videos.length ? `<div class="grid3">${d.videos.map(v => videoCard(v)).join("")}</div>` : `<div class="empty">Nothing trending yet.</div>`;
+  } catch (e) { box.innerHTML = `<div class="empty">Could not load trending.</div>`; }
+}
+
+async function renderSearchResults(body, q) {
+  body.innerHTML = `<div class="loading" style="padding:40px 0"><div class="spinner"></div></div>`;
+  try {
+    const d = await api(`/api/search?q=${encodeURIComponent(q)}`);
+    if (!document.contains(body)) return;
+    const total = d.videos.length + d.challenges.length + d.creators.length + d.categories.length + d.journeys.length;
+    body.innerHTML = total ? `
+      ${d.journeys.length ? `<div class="srch-group">${secHead("", "film", "JOURNEYS", "")}
+        ${d.journeys.map(j => `<div class="srch-ch-row" data-nav="/story/${j.id}"><div style="flex:1;min-width:0"><div class="sc-code">OFFICIAL JOURNEY</div><div class="sc-title">${esc(j.title)}</div></div>${ic("arrow", 14)}</div>`).join("")}</div>` : ""}
+      ${d.challenges.length ? `<div class="srch-group">${secHead("", "flame", "CHALLENGES", "")}
+        ${d.challenges.map(c => `<div class="srch-ch-row" data-nav="/challenge/${c.id}">
+          <div style="flex:1;min-width:0"><div class="sc-code">${esc(c.code)}</div><div class="sc-title">${esc(c.title)}</div></div>${stagePill(c.stage)}</div>`).join("")}</div>` : ""}
+      ${d.creators.length ? `<div class="srch-group">${secHead("", "user", "CREATORS", "")}
+        ${d.creators.map(u => `<div class="srch-creator" data-nav="/user/${u.username}">${avatar(u, "sm")}
+          <div><div class="sc-n">${esc(u.display_name)}</div><div class="sc-u">@${esc(u.username)} · ${u.followers} followers</div></div></div>`).join("")}</div>` : ""}
+      ${d.categories.length ? `<div class="srch-group">${secHead("", "globe", "TOPICS", "")}
+        <div class="cat-chips">${d.categories.map(c => `<button class="cat-chip" data-nav="/category/${c.slug}">${esc(c.name)}</button>`).join("")}</div></div>` : ""}
+      ${d.videos.length ? `<div class="srch-group">${secHead("", "eye", "VIDEOS", "")}
+        <div class="grid3">${d.videos.map(v => videoCard(v)).join("")}</div></div>` : ""}`
+    : `<div class="empty">${ic("target", 22)}<br>No results for "${esc(q)}". Try "dance", "football" or "cooking".</div>`;
+  } catch (e) { body.innerHTML = `<div class="empty">Search failed — try again.</div>`; }
+}
+
+async function viewCategory(slug) {
+  const d = await api(`/api/category/${encodeURIComponent(slug)}`).catch(() => null);
+  if (!d) return `<div class="err-block"><h3>THIS TOPIC HAS LEFT THE ARENA</h3><p>It may have been renamed.</p><br><button class="btn btn-fire" data-nav="/discover">BACK TO DISCOVERY</button></div>`;
+  return `
+  <div class="page-head">
+    <span class="crumb">DISCOVERY / TOPIC</span>
+    <h1 class="big-title">${esc(d.category.name).toUpperCase()}</h1>
+    <div class="meta-row">${d.challenges.length} challenge${d.challenges.length === 1 ? "" : "s"} · ${d.videos.length} videos${d.category.parent ? ` · under ${esc(d.category.parent)}` : ""}</div>
+  </div>
+  ${d.challenges.length ? `${secHead("", "flame", "CHALLENGES", "")}<div class="arena-grid">${d.challenges.map(arenaCard).join("")}</div>` : ""}
+  ${d.videos.length ? `${secHead("", "eye", "VIDEOS", "")}<div class="grid3">${d.videos.map(v => videoCard(v)).join("")}</div>`
+    : `<div class="empty">Nothing in this topic yet — be the first to CREATE IT.</div>`}`;
+}
+
+async function viewStory(jid) {
+  const d = await api(`/api/journey-story/${encodeURIComponent(jid)}`).catch(() => null);
+  if (!d) return `<div class="err-block"><h3>THIS STORY HAS LEFT THE ARENA</h3><br><button class="btn btn-fire" data-nav="/discover">BACK TO DISCOVERY</button></div>`;
+  let chNo = 0;
+  const chapter = (label, v, cap, cls = "") => v ? `<div class="chapter ${cls}">
+    <div class="ch-no"><b>${String(++chNo).padStart(2, "0")}</b>SCENE</div>
+    <div class="ch-th" data-act="open-video" data-vid="${v.id}">${thumb(v)}</div>
+    <div class="ch-body"><div class="ch-label">${label}</div>
+      <div style="font-weight:700">${esc(v.title)}</div>
+      <div class="ch-cap">${cap}</div></div>
+  </div>` : "";
+  const arc = d.arc || [];
+  const picks = arc.length > 4 ? [arc[0], arc[Math.floor(arc.length / 2)], arc[arc.length - 1]] : arc;
+  return `
+  <div class="story-head">
+    <div class="story-k">OFFICIAL CREATEIT JOURNEY · ${esc(d.challenge.code)}</div>
+    <div class="story-t">${esc(d.journey.title)}</div>
+    <div class="story-tag">${esc(d.journey.tagline)}</div>
+  </div>
+  ${chapter("THE ORIGINAL — WHERE IT ALL BEGAN", d.original, `Created by @${esc(d.challenge.creator.username)}. The benchmark the world had to chase.`)}
+  ${picks.map(v => chapter(`RECREATE — ATTEMPT #${v.attempt_no}${v.score != null ? ` · ${v.score}%` : ""}`, v,
+    `@${esc(v.owner.username)} — ${v.score >= 100 ? "recreate complete." : "the story continues."}`)).join("")}
+  ${(d.beatits || []).map(v => chapter(`BEAT IT — FINAL SUBMISSION${v.score != null ? ` · ${v.score}%` : ""}`, v,
+    `@${esc(v.owner.username)} took one final shot at the original.`, v.score > 100 ? "champ-ch" : "")).join("")}
+  ${d.champion_video && d.champion && !d.beatits.some(b => b.score > 100) ? `<div class="chapter champ-ch">
+    <div class="ch-no"><b>${String(++chNo).padStart(2, "0")}</b>SCENE</div>
+    <div class="ch-th" data-act="open-video" data-vid="${d.champion_video.id}">${thumb(d.champion_video)}</div>
+    <div class="ch-body"><div class="ch-label" style="color:var(--gold)">CHAMPION</div>
+      <div style="font-weight:700">@${esc(d.champion.username)}${d.challenge.champion ? ` — ${d.challenge.champion.score}%` : ""}</div>
+      <div class="ch-cap">The crown. The record. The next challenger is already watching.</div></div>
+  </div>` : ""}
+  <div style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap">
+    <button class="btn btn-fire" data-nav="/challenge/${d.challenge.id}">${ic("flame", 13)} ENTER THIS CHALLENGE</button>
+    <button class="btn" data-nav="/discover">BACK TO DISCOVERY</button>
+  </div>`;
 }
 
 // ---------------- MY ATTEMPTS page ----------------
@@ -1650,6 +1821,14 @@ async function route() {
     const parts = path.split("/").filter(Boolean);
     if (parts.length === 1 && parts[0] === "attempts") {
       html = await viewAttempts();
+    } else if (parts.length === 2 && parts[0] === "arena" && parts[1] === "recreate") {
+      html = await viewArenaRecreate();
+    } else if (parts.length === 2 && parts[0] === "arena" && parts[1] === "beatit") {
+      html = await viewArenaBeatit();
+    } else if (parts.length === 2 && parts[0] === "category") {
+      html = await viewCategory(decodeURIComponent(parts[1]));
+    } else if (parts.length === 2 && parts[0] === "story") {
+      html = await viewStory(decodeURIComponent(parts[1]));
     } else if (parts.length === 1 && parts[0] === "discover") {
       html = await viewDiscover(query);
     } else if (parts.length === 3 && parts[0] === "journey") {
