@@ -1410,31 +1410,29 @@ async function viewProfile(username) {
   const tabs = [["creations", "CREATE IT", d.creations.length], ["recreates", "RECREATE IT", recreates.length],
                 ["beatit", "BEAT IT", d.beatit_list.length], ["journeys", "JOURNEY", d.journeys.length], ["saved", "ATTEMPTS", (d.saved || []).length]];
   return `
-  <div class="prof-head">
-    ${avatar(u, "lg")}
-    <div class="prof-id"><h1>${esc(u.display_name)}</h1><div class="un">@${esc(u.username)} ${u.is_admin ? '· <span class="pill-mini pm-gold">CREATEIT TEAM</span>' : ""}</div>
-      <div style="color:var(--mut);font-size:13.5px;margin-top:4px">${esc(u.bio || "No bio yet — too busy practicing.")}</div></div>
-    <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">${followBtn}
-      ${own ? `<button class="btn btn-sm" data-nav="/settings">${ic("gear", 14)} SETTINGS</button>${ME.is_admin ? `<button class="btn btn-sm" data-nav="/admin">${ic("shield", 14)} ADMIN</button>` : ""}` : ""}
-      <div style="color:var(--mut);font-size:13px"><b style="color:var(--text)">${u.followers}</b> followers · <b style="color:var(--text)">${u.following}</b> following</div></div>
-  </div>
-  <div class="socials" style="margin:4px 0 6px">${socChips}${own ? `<button class="soc-chip" id="btn-edit-socials">${ic("plus", 12)} EDIT SOCIALS</button>` : ""}
-    ${!socChips && !own ? `<span style="color:var(--dim);font-size:12px">No socials linked yet.</span>` : ""}
+  <div class="pf-clean">
+    <div class="pf-toprow">
+      <div class="pf-avwrap">${avatar(u, "xl")}</div>
+      <div class="pf-stats3">
+        <div class="pf-stat"><b>${u.followers}</b><span>Followers</span></div>
+        <div class="pf-stat"><b>${u.following}</b><span>Following</span></div>
+        <div class="pf-stat"><b>${st.attempts}</b><span>Attempts</span></div>
+      </div>
+      <div class="pf-actcol">${followBtn || `<span></span>`}
+        ${own ? `<button class="pf-icobtn" data-nav="/settings" aria-label="Settings">${ic("gear", 18)}</button>${ME.is_admin ? `<button class="pf-icobtn" data-nav="/admin" aria-label="Admin">${ic("shield", 18)}</button>` : ""}` : `<button class="pf-icobtn" aria-label="Share">${ic("share", 17)}</button>`}
+      </div>
+    </div>
+    <div class="pf-name">${esc(u.display_name)} ${u.is_admin ? `<span class="pf-team">CREATEIT</span>` : ""}</div>
+    <div class="pf-handle">@${esc(u.username)}</div>
+    ${u.bio ? `<div class="pf-bio">${esc(u.bio)}</div>` : (own ? "" : `<div class="pf-bio pf-bio-dim">No bio yet — too busy practicing.</div>`)}
+    ${(d.badges || []).length ? `<div class="pf-ach">${d.badges.map(b => `<span class="pf-ach-item">${ic(b.icon, 13)} ${esc(b.label)}</span>`).join("")}</div>` : ""}
+    ${socChips || (own ? `<button class="pf-addsoc" id="btn-edit-socials">${ic("plus", 12)} Link socials</button>` : "")}
   </div>
   ${own ? `<div id="socials-form" style="display:none;gap:8px;flex-wrap:wrap;margin:10px 0;max-width:640px">
     <input class="input" id="soc-yt" placeholder="YouTube channel URL" value="${esc(soc.youtube || "")}" style="flex:1;min-width:180px">
     <input class="input" id="soc-tk" placeholder="TikTok URL" value="${esc(soc.tiktok || "")}" style="flex:1;min-width:180px">
     <input class="input" id="soc-ig" placeholder="Instagram URL" value="${esc(soc.instagram || "")}" style="flex:1;min-width:180px">
     <button class="btn btn-sm btn-fire" id="btn-save-socials">SAVE</button></div>` : ""}
-  <div class="stat-strip">
-    <div class="stat-box gold"><div class="v">${st.champion}</div><div class="k">Championships</div></div>
-    <div class="stat-box teal"><div class="v">${st.completed}</div><div class="k">Successful recreations</div></div>
-    <div class="stat-box violet"><div class="v">${st.attempts}</div><div class="k">Recreations</div></div>
-    <div class="stat-box fire"><div class="v">${st.beatit}</div><div class="k">Beat It entries</div></div>
-    <div class="stat-box"><div class="v">${st.created || 0}</div><div class="k">Challenges created</div></div>
-    <div class="stat-box gold"><div class="v">${st.best_score != null ? st.best_score + "%" : "—"}</div><div class="k">Best score</div></div>
-  </div>
-  ${(d.badges || []).length ? `<div class="badge-row">${d.badges.map(b => `<span class="ach-badge">${ic(b.icon, 12)} ${esc(b.label)}</span>`).join("")}</div>` : ""}
   <div class="prof-tabs">
     ${tabs.map(([k, l, n]) => `<button class="pf-tab ${k === "creations" ? "active" : ""}" data-ptab="${k}">${l} <span class="ct">${n}</span></button>`).join("")}
   </div>
