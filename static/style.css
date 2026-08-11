@@ -3475,3 +3475,50 @@ body{-webkit-overflow-scrolling:touch;overscroll-behavior:none}
   transition:.2s;box-shadow:0 4px 16px rgba(0,0,0,.4)}
 .p-sound:hover{background:rgba(255,255,255,.16)}
 .p-sound.on{background:var(--grad-fire);border-color:transparent;box-shadow:var(--glow-fire)}
+
+/* ════════════════════════════════════════════════════════════
+   v43 — HALL OF FAME editorial redesign (prestige, not game)
+   ════════════════════════════════════════════════════════════ */
+/* tone down the hero — less glow, cleaner */
+.hall-hero{background:linear-gradient(170deg,#12100a,#080807);border-color:rgba(255,255,255,.07)}
+.hall-hero-glow{opacity:.4;animation:none}
+.hall-hero-crown{animation:none;filter:none;color:#c9a24a;margin-bottom:14px}
+.hall-hero-t{background:none;-webkit-text-fill-color:initial;color:var(--text);letter-spacing:3px;font-size:clamp(30px,6vw,44px)}
+.hall-hero-s{letter-spacing:.28em;font-size:10.5px;color:var(--dim)}
+.hall-stat b{color:var(--text);font-family:var(--body);font-weight:800;font-size:24px}
+.hall-stat + .hall-stat::before{background:rgba(255,255,255,.08)}
+
+/* editorial section label */
+.hof2-sec{display:flex;align-items:baseline;gap:14px;margin:6px 0 4px;padding-bottom:12px;
+  border-bottom:1px solid rgba(255,255,255,.09)}
+.hof2-sec span{font-size:12px;font-weight:800;letter-spacing:.34em;color:var(--text)}
+.hof2-sec em{font-style:normal;font-size:11px;color:var(--dim);margin-left:auto;letter-spacing:.03em}
+
+/* editorial legend rows — clean, hairline-divided, monochrome */
+.hof-list{display:flex;flex-direction:column}
+.hof2-row{display:flex;align-items:center;gap:18px;padding:20px 8px;cursor:pointer;position:relative;
+  border-bottom:1px solid rgba(255,255,255,.06);transition:background .2s ease}
+.hof2-row:hover{background:rgba(255,255,255,.025)}
+.hof2-row:active{background:rgba(255,255,255,.04)}
+.hof2-row:last-child{border-bottom:none}
+.hof2-rank{flex:none;width:38px;font-family:var(--mono);font-size:15px;color:var(--dim);letter-spacing:.05em}
+.hof2-first .hof2-rank{color:#c9a24a;font-weight:700}
+.hof2-row .avatar.md{width:52px;height:52px}
+.hof2-id{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.hof2-id b{font-size:16px;font-weight:800;letter-spacing:.01em}
+.hof2-id span{font-size:12.5px;color:var(--dim)}
+.hof2-right{flex:none;text-align:right;display:flex;flex-direction:column;gap:4px;max-width:42%}
+.hof2-headline{font-style:normal;font-size:10px;font-weight:800;letter-spacing:.18em;color:var(--mut)}
+.hof2-first .hof2-headline{color:#c9a24a}
+.hof2-summary{font-size:11px;color:var(--dim);letter-spacing:.02em;line-height:1.4}
+.hof2-play{flex:none;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  color:var(--mut);border:1px solid rgba(255,255,255,.12);transition:.2s}
+.hof2-row:hover .hof2-play{color:#fff;border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.05)}
+.hof2-first .hof2-play{color:#c9a24a;border-color:rgba(201,162,74,.4)}
+/* subtle first-place marker, no glow */
+.hof2-first::before{content:"";position:absolute;left:0;top:20px;bottom:20px;width:2px;background:#c9a24a;border-radius:2px}
+@media (max-width:480px){
+  .hof2-right{display:none}
+  .hof2-id span::after{content:"";display:block}
+  .hof2-summary{display:none}
+}

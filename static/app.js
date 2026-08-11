@@ -1335,22 +1335,31 @@ async function viewCreate(query) {
 
 function legendRow(l, i) {
   const st = l.stats; const rank = i + 1;
-  const ach = [];
-  if (st.records_now) ach.push(`<span class="hof-ach gold">${ic("crown", 12)} ${st.records_now} RECORD${st.records_now > 1 ? "S" : ""}</span>`);
-  if (st.records_past) ach.push(`<span class="hof-ach gold2">${ic("disc", 12)} ${st.records_past} PAST REIGN${st.records_past > 1 ? "S" : ""}</span>`);
-  if (st.completed) ach.push(`<span class="hof-ach teal">${ic("check", 12)} ${st.completed} RECREATED</span>`);
-  if (st.beatit) ach.push(`<span class="hof-ach fire">${ic("zap", 12)} ${st.beatit} BEAT IT</span>`);
-  if (st.created) ach.push(`<span class="hof-ach violet">${ic("film", 12)} ${st.created} CREATED</span>`);
+  let headline;
+  if (st.records_now) headline = st.records_now === 1 ? "RECORD HOLDER" : st.records_now + "× RECORD HOLDER";
+  else if (st.records_past) headline = "FORMER CHAMPION";
+  else if (st.completed) headline = "MASTER RECREATOR";
+  else if (st.created) headline = "CHALLENGE CREATOR";
+  else headline = "COMPETITOR";
+  const parts = [];
+  if (st.records_now) parts.push(st.records_now + " record" + (st.records_now > 1 ? "s" : ""));
+  if (st.completed) parts.push(st.completed + " recreated");
+  if (st.beatit) parts.push(st.beatit + " beat it");
+  if (st.created) parts.push(st.created + " created");
+  const summary = parts.join("  ·  ") || "Rising competitor";
   return `
-  <div class="hof-row${rank <= 3 ? " hof-podium" : ""}" data-hof="${i}">
-    <div class="hof-rank${rank <= 3 ? " top" : ""}">${rank <= 3 ? ic("crown", 15) : rank}</div>
+  <div class="hof2-row${rank === 1 ? " hof2-first" : ""}" data-hof="${i}">
+    <span class="hof2-rank">${String(rank).padStart(2, "0")}</span>
     ${avatar(l.user, "md")}
-    <div class="hof-mid">
-      <div class="hof-name">${esc(l.user.display_name)} <span>@${esc(l.user.username)}</span></div>
-      <div class="hof-achs">${ach.join("") || `<span class="hof-ach">${ic("spark", 12)} RISING</span>`}</div>
+    <div class="hof2-id">
+      <b>${esc(l.user.display_name)}</b>
+      <span>@${esc(l.user.username)}</span>
     </div>
-    <div class="hof-fame"><b>${l.fame}</b><span>FAME</span></div>
-    <div class="hof-play">${ic("play", 17)}</div>
+    <div class="hof2-right">
+      <em class="hof2-headline">${headline}</em>
+      <span class="hof2-summary">${summary}</span>
+    </div>
+    <span class="hof2-play" aria-label="Play achievements">${ic("play", 16)}</span>
   </div>`;
 }
 
@@ -1426,11 +1435,11 @@ async function viewRecords() {
     <div class="hall-search">${ic("target", 18)}<input id="hall-search" placeholder="Search records, champions, challenges…" autocomplete="off"></div>
   </div>
 
-  <div class="hof-sec"><span>${ic("crown", 16)}</span> LEGENDS <em>tap a name — their achievements autoplay</em></div>
+  <div class="hof2-sec"><span>THE LEGENDS</span><em>Select a name — their story plays</em></div>
   ${legends.length ? `<div class="hof-list">${legends.map((l, i) => legendRow(l, i)).join("")}</div>`
     : `<div class="empty">${ic("crown", 24)}<br>No legends yet. Set a record and claim your place.</div>`}
 
-  <div class="hof-sec" style="margin-top:34px"><span>${ic("disc", 16)}</span> RECORDS</div>
+  <div class="hof2-sec" style="margin-top:40px"><span>THE RECORDS</span><em>Every mark, permanent</em></div>
   <div id="hall-list">${renderRecordsList(rec.records, window.__LONGEST_ID)}</div>
   `;
 }
@@ -2639,10 +2648,23 @@ function heroViewGate() {
 function heroSoundArm() {
   const hv = $("#hero-video");
   if (!hv) return;
-  // Muted-first cinematic autoplay — sound only when the user taps the sound button.
-  // This kills the "sound playing everywhere" bug.
-  hv.muted = true;
-  hv.play().catch(() => {});
+  const btn = on => { const b = document.querySelector(".p-sound"); if (b) { b.innerHTML = ic(on ? "volume2" : "volumeX", 20); b.classList.toggle("on", on); } };
+  // AUTO-PLAY WITH SOUND. If the OS blocks audible autoplay, fall back to unmute on first touch.
+  hv.muted = false;
+  const p = hv.play();
+  if (p) p.then(() => { if (typeof soloAudio === "function") soloAudio(hv); btn(true); })
+    .catch(() => {
+      hv.muted = true;                       // OS blocked audible autoplay — keep it moving silently
+      hv.play().catch(() => {});
+      const onFirst = () => {                // sound switches on at the first touch, automatically
+        document.removeEventListener("pointerdown", onFirst);
+        hv.muted = false;
+        if (typeof soloAudio === "function") soloAudio(hv);
+        hv.play().catch(() => {});
+        btn(true);
+      };
+      document.addEventListener("pointerdown", onFirst);
+    });
 }
 
 function routeLine() {
