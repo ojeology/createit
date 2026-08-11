@@ -337,6 +337,7 @@ function renderChrome() {
     <button class="rail-item ${route.startsWith("/challenges") ? "active" : ""}" data-nav="/challenges"><span class="ico">${ic("flame", 18)}</span>Arena</button>
     <button class="rail-item ${route.startsWith("/attempts") ? "active" : ""}" data-nav="/attempts"><span class="ico">${ic("target", 18)}</span>Attempts</button>
     <button class="rail-item ${route.startsWith("/leaderboard") ? "active" : ""}" data-nav="/leaderboard"><span class="ico">${ic("trophy", 18)}</span>Ranks</button>
+    <button class="rail-item ${route.startsWith("/records") ? "active" : ""}" data-nav="/records"><span class="ico">${ic("disc", 18)}</span>Records</button>
     <button class="rail-item ${route.startsWith("/notifications") ? "active" : ""}" data-nav="/notifications"><span class="ico">${ic("bell", 18)}</span>Notifications${unread ? ` <span class="dot-badge" style="position:static;margin-left:4px">${unread}</span>` : ""}</button>
     ${ME?.is_admin ? `<button class="rail-item ${route.startsWith("/admin") ? "active" : ""}" data-nav="/admin"><span class="ico">${ic("shield", 18)}</span>Admin Panel</button>` : ""}
     ${railUser}`;
@@ -924,7 +925,7 @@ async function viewHome() {
   </div>`}
 
   ${d.champions.length ? `
-  ${secHead("", "disc", "Records & champions", "permanent history — records exist to be broken", ["Full ranks", "#/leaderboard"])}
+  ${secHead("", "disc", "Records & champions", "permanent history — records exist to be broken", ["Hall of Records", "#/records"])}
   <div class="records-grid">${d.champions.map(recordCard).join("")}</div>` : ""}
 
   <div class="manifesto">
@@ -1319,6 +1320,59 @@ async function viewCreate(query) {
     beatit: [ic("zap",22) + " BEAT IT", "Your one final submission. Surpass the original."],
   };
   return `${back}<div class="page-head"><h1 class="big-title" style="font-size:30px">${heads[kind][0]}</h1><div class="meta-row">${heads[kind][1]}</div></div>${form(extra)}`;
+}
+
+async function viewRecords() {
+  const d = await api("/api/records");
+  const L = d.longest;
+  return `
+  <div class="page-head"><span class="crumb">CREATEIT</span><h1 class="big-title">HALL OF RECORDS</h1>
+  <div class="meta-row">Every record is permanent. Every reign is history. Come break one.</div></div>
+  ${!d.records.length ? `<div class="empty">${ic("disc", 26)}<br>No records set yet. The first champion makes history.</div>` : `
+    ${L ? `
+    <div class="hr-spot">
+      <div class="hr-spot-k">${ic("crown", 15)} LONGEST-HELD RECORD</div>
+      <div class="hr-spot-top">
+        ${L.video ? `<div class="hr-spot-vid" data-act="watch" data-vid="${L.video.id}" style="cursor:pointer">
+          <img src="${L.video.poster || ""}" alt="">${ic("play", 30)}</div>` : ""}
+        <div class="hr-spot-info">
+          <div class="hr-spot-code">${esc(L.challenge.code)} · ${esc(L.challenge.title)}</div>
+          <div class="hr-spot-champ">${avatar(L.champion, "md")} <b>@${esc(L.champion.username)}</b>
+            <span class="hr-spot-score">${L.champion.score}%</span></div>
+          <div class="hr-spot-days">${ic("clock", 13)} unbeaten for <b>${L.champion.unbeaten_days}</b> day${L.champion.unbeaten_days === 1 ? "" : "s"}</div>
+        </div>
+      </div>
+    </div>` : ""}
+    <div class="hr-grid">
+      ${d.records.map(r => `
+      <div class="hr-card">
+        <div class="hr-card-top" data-nav="/challenge/${r.challenge.id}">
+          <div class="hr-code">${esc(r.challenge.code)}</div>
+          <div class="hr-title">${esc(r.challenge.title)}</div>
+        </div>
+        <div class="hr-champ">
+          ${avatar(r.champion, "md")}
+          <div class="hr-champ-mid">
+            <b data-nav="/user/${r.champion.username}">@${esc(r.champion.username)}</b>
+            <span>${ic("clock", 11)} ${r.champion.unbeaten_days}d unbeaten${r.challengers ? ` · ${r.challengers} qualified to break it` : ""}</span>
+          </div>
+          <div class="hr-score">${r.champion.score}<em>%</em></div>
+        </div>
+        ${r.history.length ? `
+          <div class="hr-hist-h">RECORD HISTORY</div>
+          <div class="hr-hist">
+            ${r.history.slice(0, 4).map((h, i) => `
+              <div class="hr-hist-row">
+                <span class="hr-hist-rank">#${i + 2}</span>${avatar(h.user, "sm")}
+                <span class="hr-hist-u">@${esc(h.user.username)}</span>
+                <span class="hr-hist-s">${h.score}%</span>
+                ${h.held_days != null ? `<span class="hr-hist-d">held ${h.held_days}d</span>` : ""}
+              </div>`).join("")}
+          </div>` : `<div class="hr-hist-none">First reign — no one has broken it yet.</div>`}
+        <button class="btn btn-fire btn-block hr-break" data-nav="/challenge/${r.challenge.id}">${ic("zap", 14)} TRY TO BREAK IT</button>
+      </div>`).join("")}
+    </div>`}
+  `;
 }
 
 async function viewLeaderboard() {
@@ -2582,6 +2636,8 @@ async function route() {
       html = await viewStory(decodeURIComponent(parts[1]));
     } else if (parts.length === 1 && parts[0] === "discover") {
       html = await viewDiscover(query);
+    } else if (parts.length === 1 && parts[0] === "records") {
+      html = await viewRecords();
     } else if (parts.length === 3 && parts[0] === "journey") {
       html = await viewJourney(parts[1], parts[2]);
     } else if (parts.length === 2 && VIEWS["/" + parts[0]]) {

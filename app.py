@@ -1164,6 +1164,57 @@ def discover_feed():
     return jsonify(videos=videos_pub(rows, me), filter=f)
 
 # ---------------------------------------------------------------- leaderboard & records
+@app.get("/api/records")
+def records_hall():
+    me = current_user()
+    chs = qa("""SELECT c.*, u.username c_un, u.display_name c_dn, u.avatar_photo c_ap, u.color c_col
+                FROM challenges c JOIN users u ON u.id=c.champion_id
+                WHERE c.champion_id IS NOT NULL AND c.stage='champion' ORDER BY c.champion_at DESC LIMIT 30""")
+    if not chs: return jsonify(records=[], longest=None)
+    cids = [c["id"] for c in chs]
+    ph = ",".join("?" * len(cids))
+    hist = qa(f"SELECT * FROM champions_history WHERE challenge_id IN ({ph}) ORDER BY achieved_at DESC", tuple(cids))
+    hist_by = {}
+    for h in hist: hist_by.setdefault(h["challenge_id"], []).append(h)
+    huids = list({h["user_id"] for h in hist} | {c["champion_id"] for c in chs})
+    umap = users_pub_map(huids)
+    qual = {a: b for a, b in qa(f"""SELECT challenge_id, COUNT(DISTINCT user_id) FROM videos
+                WHERE challenge_id IN ({ph}) AND kind='recreate' AND score>=100 GROUP BY challenge_id""", tuple(cids))}
+    vids = [c["champion_video_id"] for c in chs if c["champion_video_id"]]
+    vmap = {}
+    if vids:
+        phv = ",".join("?" * len(vids))
+        vmap = {r["id"]: r for r in qa(f"SELECT * FROM videos WHERE id IN ({phv})", tuple(vids))}
+    def _held_days(a):
+        try:
+            pa = datetime.datetime.strptime((a or "")[:19], "%Y-%m-%dT%H:%M:%S")
+            return max(0, (datetime.datetime.utcnow() - pa).days)
+        except (ValueError, TypeError): return 0
+    out = []
+    for c in chs:
+        champ = umap.get(c["champion_id"], {})
+        hv = vmap.get(c["champion_video_id"])
+        history = []
+        for h in hist_by.get(c["id"], []):
+            hu = umap.get(h["user_id"], {})
+            held = None
+            try:
+                pa = datetime.datetime.strptime((h["achieved_at"] or "")[:19], "%Y-%m-%dT%H:%M:%S")
+                pb = datetime.datetime.strptime((h["superseded_at"] or "")[:19], "%Y-%m-%dT%H:%M:%S")
+                held = max(0, (pb - pa).days)
+            except (ValueError, TypeError): pass
+            history.append({"user": hu, "score": h["score"], "achieved_at": h["achieved_at"], "held_days": held})
+        q_count = max(0, qual.get(c["id"], 0) - 1)
+        out.append({
+            "challenge": {"id": c["id"], "code": c["code"], "title": c["title"]},
+            "champion": {**champ, "score": c["champion_score"], "at": c["champion_at"], "unbeaten_days": _held_days(c["champion_at"])},
+            "video": {"id": hv["id"], "src": "/uploads/" + hv["file"], "poster": _poster_for(hv["file"])} if hv else None,
+            "history": history,
+            "challengers": q_count,
+        })
+    longest = max(out, key=lambda r: r["champion"]["unbeaten_days"]) if out else None
+    return jsonify(records=out, longest=longest)
+
 @app.get("/api/leaderboard")
 def leaderboard():
     me = current_user()
