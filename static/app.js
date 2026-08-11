@@ -76,6 +76,7 @@ function scoreBadge(score) {
 }
 
 function avatar(u, cls = "") {
+  if (u && u.you_follow !== undefined && u.username && typeof FOLLOW_STATE !== "undefined") FOLLOW_STATE[u.username] = !!u.you_follow;
   if (u.avatar_photo) return `<span class="avatar ${cls} av-photo" style="border-color:${u.color}66"><img src="${u.avatar_photo}" alt=""></span>`;
   return `<span class="avatar ${cls}" style="background:${u.color}22;border-color:${u.color}55">${u.avatar}</span>`;
 }
@@ -515,15 +516,7 @@ document.addEventListener("click", async e => {
         toast(d.saved ? "Saved to Attempts — go practice." : "Removed from Attempts");
       } catch (err) { toast(err.message, true); }
     }
-    else if (act === "disc-follow") {
-      if (!ME) { location.hash = "/login"; return; }
-      try {
-        const r = await api(`/api/user/${el.dataset.user}/follow`, { method: "POST" });
-        el.classList.toggle("on", r.following);
-        el.innerHTML = r.following ? ic("check", 17) : "＋";
-        toast(r.following ? `Following @${el.dataset.user}` : `Unfollowed @${el.dataset.user}`);
-      } catch (err) { toast(err.message, true); }
-    }
+    else if (act === "disc-follow") { toggleFollow(el.dataset.user); }
     else if (act === "player-sound") {
       const v = $("#pl-video");
       if (v) { v.muted = !v.muted; el.innerHTML = ic(v.muted ? "volumeX" : "volume2", 18); el.classList.toggle("on", !v.muted); }
@@ -666,14 +659,40 @@ function beatBoard(c) {
 }
 
 let HOME_DATA = null;
-async function toggleFollow(username, btn) {
+// ---------------- global follow state: one source of truth ----------------
+const FOLLOW_STATE = {};
+function setFollowState(username, following) {
+  FOLLOW_STATE[username] = !!following;
+  syncFollowUI(username);
+}
+function syncFollowUI(username) {
+  const on = !!FOLLOW_STATE[username];
+  document.querySelectorAll(`[data-follow="${username}"]`).forEach(el => {
+    el.classList.toggle("on", on);
+    if (el.classList.contains("btn")) el.classList.toggle("btn-fire", !on);
+    const style = el.dataset.followStyle || "btn";
+    if (style === "chip") el.innerHTML = on ? "FOLLOWING ✓" : "FOLLOW";
+    else if (style === "icon") el.innerHTML = on ? ic("check", 17) : "＋";
+    else el.innerHTML = on ? ic("check", 13) + " FOLLOWING" : ic("plus", 13) + " FOLLOW";
+  });
+}
+async function toggleFollow(username) {
   if (!ME) { toast("Log in to follow creators"); setTimeout(() => location.hash = "/login", 400); return; }
+  if (username === ME.username) return;
+  const next = !(FOLLOW_STATE[username] || false);
+  setFollowState(username, next);                       // optimistic — every instance updates instantly
   try {
     const d = await api(`/api/user/${username}/follow`, { method: "POST" });
-    if (btn) { btn.textContent = d.following ? "FOLLOWING ✓" : "FOLLOW"; btn.classList.toggle("on", d.following); }
+    setFollowState(username, d.following);               // server confirms the truth
     toast(d.following ? `Following @${username}.` : `Unfollowed @${username}.`);
-  } catch (err) { toast(err.message, true); }
+  } catch (err) { setFollowState(username, !next); toast(err.message, true); }
 }
+document.addEventListener("click", e => {
+  const f = e.target.closest("[data-follow]");
+  if (!f) return;
+  e.preventDefault(); e.stopPropagation();
+  toggleFollow(f.dataset.follow);
+});
 async function loadPeopleStrip() {
   const wrap = document.getElementById("people-strip-wrap");
   if (!wrap) return;
@@ -688,10 +707,10 @@ async function loadPeopleStrip() {
           <span data-nav="/user/${p.username}" style="cursor:pointer">${avatar(p, "md")}</span>
           <div class="ppl-n" data-nav="/user/${p.username}">@${esc(p.username)}</div>
           <div class="ppl-s">${p.followers} follower${p.followers === 1 ? "" : "s"}</div>
-          <button class="btn btn-sm ppl-follow ${p.you_follow ? "on" : ""}" data-pfollow="${esc(p.username)}">${p.you_follow ? "FOLLOWING ✓" : "FOLLOW"}</button>
+          <button class="btn btn-sm ppl-follow ${p.you_follow ? "on" : ""}" data-follow="${esc(p.username)}" data-follow-style="chip">${p.you_follow ? "FOLLOWING ✓" : "FOLLOW"}</button>
         </div>`).join("")}
       </div>`;
-    wrap.querySelectorAll("[data-pfollow]").forEach(b => b.addEventListener("click", () => toggleFollow(b.dataset.pfollow, b)));
+    // follow handled globally via [data-follow]
   } catch (e) { /* silent */ }
 }
 
@@ -1340,18 +1359,12 @@ async function viewProfile(username) {
   const u = d.user, st = d.stats;
   const own = ME && ME.username === u.username;
   const followBtn = ME && !own
-    ? `<button class="btn btn-sm ${u.i_follow ? "" : "btn-fire"}" id="btn-follow">${u.i_follow ? ic("check", 13) + " FOLLOWING" : ic("plus", 13) + " FOLLOW"}</button>` : "";
+    ? `<button class="btn btn-sm ${u.you_follow ? "" : "btn-fire"}" data-follow="${esc(u.username)}">${u.you_follow ? ic("check", 13) + " FOLLOWING" : ic("plus", 13) + " FOLLOW"}</button>` : "";
   const soc = u.socials || {};
   const socChips = [["youtube", soc.youtube, "YouTube"], ["tiktok", soc.tiktok, "TikTok"], ["instagram", soc.instagram, "Instagram"]]
     .filter(([k, v]) => v).map(([k, v, label]) => `<a class="soc-chip ${k === "youtube" ? "yt" : ""}" href="${esc(v)}" target="_blank" rel="noopener">${socIcon(k)} ${label}</a>`).join("");
   setTimeout(() => {
-    $("#btn-follow")?.addEventListener("click", async e => {
-      try {
-        const r = await api(`/api/user/${u.username}/follow`, { method: "POST" });
-        e.target.innerHTML = r.following ? ic("check", 13) + " FOLLOWING" : ic("plus", 13) + " FOLLOW";
-        e.target.classList.toggle("btn-fire", !r.following);
-      } catch (err) { toast(err.message, true); if (err.message === "Login required") location.hash = "/login"; }
-    });
+    // follow handled globally via [data-follow]
     $$(".pf-tab").forEach(t => t.addEventListener("click", () => renderProfTab(t.dataset.ptab)));
     $("#btn-edit-socials")?.addEventListener("click", () => {
       const f = $("#socials-form");
@@ -1393,6 +1406,7 @@ async function viewProfile(username) {
     <div class="stat-box"><div class="v">${st.created || 0}</div><div class="k">Challenges created</div></div>
     <div class="stat-box gold"><div class="v">${st.best_score != null ? st.best_score + "%" : "—"}</div><div class="k">Best score</div></div>
   </div>
+  ${(d.badges || []).length ? `<div class="badge-row">${d.badges.map(b => `<span class="ach-badge">${ic(b.icon, 12)} ${esc(b.label)}</span>`).join("")}</div>` : ""}
   <div class="prof-tabs">
     ${tabs.map(([k, l, n]) => `<button class="pf-tab ${k === "creations" ? "active" : ""}" data-ptab="${k}">${l} <span class="ct">${n}</span></button>`).join("")}
   </div>

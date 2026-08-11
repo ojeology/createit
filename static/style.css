@@ -2653,3 +2653,17 @@ body:has(#djr) #backbtn, body:has(.player) #backbtn{display:none !important}
 .c-like em{font-style:normal}
 .c-like:active{transform:scale(1.2)}
 .c-like.on{color:var(--red)}
+
+/* ============================================================
+   v31 — achievements, follow sync, records polish
+   ============================================================ */
+.badge-row{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 2px}
+.ach-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;
+  font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:var(--ink2);
+  background:var(--paper2);border:1px solid rgba(216,166,72,.4);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+[data-theme="dark"] .ach-badge{background:#15171d}
+.ach-badge .ic{color:var(--gold)}
+[data-follow]{transition:transform .12s ease, background .2s ease}
+[data-follow]:active{transform:scale(.94)}
+[data-follow].on{background:rgba(31,122,92,.16);color:var(--green);border-color:rgba(31,122,92,.45)}
+.djr-follow[data-follow].on{background:rgba(31,122,92,.9);color:#fff}

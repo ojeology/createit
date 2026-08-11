@@ -408,13 +408,11 @@ function djUpdateOverlay() {
     <div class="djr-kicker">${kicker}</div>
     <div class="djr-crow">
       <div class="djr-creator" data-nav="/user/${v.owner.username}">${avatar(v.owner, "sm")} <b>@${esc(v.owner.username)}</b></div>
-      ${ME && ME.username !== v.owner.username ? `<button class="djr-follow" data-djfollow="${esc(v.owner.username)}">FOLLOW</button>` : ""}
+      ${ME && ME.username !== v.owner.username ? `<button class="djr-follow ${v.owner.you_follow ? "on" : ""}" data-follow="${esc(v.owner.username)}" data-follow-style="chip">${v.owner.you_follow ? "FOLLOWING ✓" : "FOLLOW"}</button>` : ""}
     </div>
     ${v.title ? `<div class="djr-title">${esc(v.title)}</div>` : ""}
     ${sub ? `<div class="djr-sub">${esc(sub)}</div>` : ""}`;
-  info.querySelectorAll("[data-djfollow]").forEach(b => b.addEventListener("click", () => {
-    if (typeof toggleFollow === "function") toggleFollow(b.dataset.djfollow, b);
-  }));
+  // follow handled globally via [data-follow]
   const cn = document.getElementById("djr-c-n");
   if (cn) cn.textContent = v.comments || 0;
   const ra = document.getElementById("djr-rate-avg");
@@ -664,8 +662,9 @@ function djCloseBrowse() { const el = document.getElementById("djr-browse"); if 
 async function djbLoadSections() {
   const feed = document.getElementById("djb-feed");
   if (!feed) return;
-  const [jr, cr, tr, ch] = await Promise.allSettled([
-    api("/api/journeys"), api("/api/categories"), api("/api/discover?filter=trending&limit=6"), api("/api/challenges")]);
+  const [jr, cr, tr, ch, ff] = await Promise.allSettled([
+    api("/api/journeys"), api("/api/categories"), api("/api/discover?filter=trending&limit=6"), api("/api/challenges"),
+    ME ? api("/api/following-feed?limit=6") : Promise.resolve({ videos: [] })]);
   if (!document.getElementById("djb-feed")) return;
   const journeys = jr.status === "fulfilled" ? jr.value.journeys : [];
   const upcoming = jr.status === "fulfilled" ? jr.value.upcoming : [];
@@ -675,7 +674,13 @@ async function djbLoadSections() {
   const all = ch.status === "fulfilled" ? ch.value.challenges : [];
   const live = all.filter(c => c.stage === "recreate_it");
   const beat = all.filter(c => c.stage === "beat_it" || c.stage === "recreate_closed");
+  const fvids = ff.status === "fulfilled" ? (ff.value.videos || []) : [];
+  window.__djbFollowing = fvids;
   feed.innerHTML = `
+    ${fvids.length ? `<div class="djb-sec">FROM CREATORS YOU FOLLOW</div><div class="grid3">${fvids.map((v, i) => {
+      const card = videoCard(v);
+      return card.replace('data-act="open-video"', `data-act="dj-pick-following" data-pi="${i}"`);
+    }).join("")}</div>` : ""}
     ${(journeys.length || upcoming.length) ? `<div class="djb-sec">OFFICIAL JOURNEYS</div>
       <div class="hscroll">
         ${journeys.map(j => `<div class="jrn-card" data-act="dj-enter-story" data-id="${j.id}" data-label="${esc(j.title)}">
@@ -828,6 +833,7 @@ document.addEventListener("click", async e => {
     case "dj-enter-cat": djEnterCat(el.dataset.slug, el.dataset.label || el.dataset.slug); break;
     case "dj-enter-story": djEnterStory(el.dataset.id, el.dataset.label); break;
     case "dj-pick-trend": if (window.__djbTrend) djPickFrom(window.__djbTrend, "TRENDING", +el.dataset.pi); break;
+    case "dj-pick-following": if (window.__djbFollowing) djPickFrom(window.__djbFollowing, "FOLLOWING", +el.dataset.pi); break;
     case "dj-pick-search": if (window.__djbSearch) djPickFrom(window.__djbSearch.videos, `SEARCH · ${window.__djbSearch.q.toUpperCase()}`, +el.dataset.pi); break;
   }
 });
