@@ -3173,3 +3173,55 @@ body{-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 /* comment sheet slide-up polish */
 .djr-sheet{animation:sheet-up .34s cubic-bezier(.2,1,.3,1)}
 @keyframes sheet-up{from{transform:translateY(60px);opacity:0}to{transform:none;opacity:1}}
+
+/* ════════════════════════════════════════════════════════════
+   v37 — initials avatars, manifesto, profile overlap fix, grip
+   ════════════════════════════════════════════════════════════ */
+/* clean initials avatars (no more emoji) */
+.avatar.av-init{display:inline-flex;align-items:center;justify-content:center;font-weight:800;
+  font-family:var(--display);letter-spacing:.02em;text-transform:uppercase}
+.avatar.sm.av-init{font-size:13px}
+.avatar.md.av-init{font-size:18px}
+.avatar.lg.av-init,.avatar.xl.av-init{font-size:38px}
+
+/* ---- THE MANIFESTO: the gripping brand statement ---- */
+.manifesto{margin:44px 0 20px;padding:38px 28px;border-radius:26px;position:relative;overflow:hidden;
+  border:1px solid rgba(255,255,255,.1);box-shadow:var(--shadow-2);
+  background:radial-gradient(140% 160% at 8% -10%,rgba(255,77,46,.22),transparent 48%),
+             radial-gradient(120% 140% at 96% 110%,rgba(124,92,255,.16),transparent 46%),
+             linear-gradient(160deg,#141827,#090b12)}
+.manifesto::before{content:"";position:absolute;top:0;left:28px;width:6px;height:64px;border-radius:4px;
+  background:var(--grad-fire);box-shadow:var(--glow-red);transform:skewX(-14deg)}
+.mf-line{font-family:var(--display);font-size:clamp(21px,4.4vw,30px);letter-spacing:.5px;line-height:1.28;
+  color:var(--ink2,var(--mut));animation:mf-rise .6s cubic-bezier(.16,1,.3,1) both}
+.mf-line:nth-child(2){animation-delay:.1s}.mf-line:nth-child(3){animation-delay:.2s}.mf-line:nth-child(4){animation-delay:.3s}
+@keyframes mf-rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+.mf-line span{color:var(--text)}
+.mf-line em{font-style:normal;background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent}
+.mf-line b{color:#fff;position:relative}
+.mf-line b::after{content:"";position:absolute;left:0;right:0;bottom:-2px;height:3px;border-radius:2px;background:var(--grad-fire);box-shadow:var(--glow-red)}
+.mf-core{color:var(--text);font-size:clamp(24px,5vw,34px)}
+
+/* ---- profile overlap fixes ---- */
+.pf-toprow{gap:18px;margin-bottom:14px}
+.pf-avwrap .avatar.xl{width:84px;height:84px;font-size:36px}
+.pf-stats3{justify-content:flex-end}
+.pf-stat{padding:0 16px}
+.pf-stat b{font-size:19px}
+/* full-width action row — no collision */
+.pf-actions{display:flex;gap:9px;align-items:center;margin:14px 0 2px}
+.pf-actions .btn{flex:1;padding:11px 12px;font-size:13px}
+.pf-actions [data-follow]{flex:1}
+.pf-actions .pf-icobtn{flex:none}
+@media (max-width:380px){
+  .pf-avwrap .avatar.xl{width:70px;height:70px;font-size:30px}
+  .pf-stat{padding:0 11px}
+  .pf-stat b{font-size:17px}
+  .pf-stat span{font-size:10px}
+}
+
+/* gripping record chip */
+.record-stands{display:inline-flex;align-items:center;gap:9px;margin-top:10px;padding:9px 15px;border-radius:999px;
+  background:rgba(245,197,24,.1);border:1px solid rgba(245,197,24,.32);color:var(--gold);
+  font-size:12px;font-weight:700;letter-spacing:.04em;animation:beat-glow 2.6s ease-in-out infinite}
+.record-stands .ic{flex:none}

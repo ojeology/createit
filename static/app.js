@@ -78,7 +78,9 @@ function scoreBadge(score) {
 function avatar(u, cls = "") {
   if (u && u.you_follow !== undefined && u.username && typeof FOLLOW_STATE !== "undefined" && !(u.username in FOLLOW_STATE)) FOLLOW_STATE[u.username] = !!u.you_follow;
   if (u.avatar_photo) return `<span class="avatar ${cls} av-photo" style="border-color:${u.color}66"><img src="${u.avatar_photo}" alt=""></span>`;
-  return `<span class="avatar ${cls}" style="background:${u.color}22;border-color:${u.color}55">${u.avatar}</span>`;
+  const nm = (u.display_name || u.username || "?").trim();
+  const ini = (nm[0] || "?").toUpperCase();
+  return `<span class="avatar ${cls} av-init" style="background:${u.color}2e;border-color:${u.color}88;color:${u.color}">${ini}</span>`;
 }
 
 // ---------------- video state machine ----------------
@@ -910,7 +912,8 @@ async function viewHome() {
     <div style="flex:1;min-width:190px">
       <div class="cp-label">CHAMPION · ${esc(h.code)}</div>
       <div class="cp-name">@${esc(h.champion.user.username)}</div>
-      <p style="color:var(--ink3);font-size:13px;margin-top:4px">Beat It score <b style="color:var(--gold)">${h.champion.score}%</b> · unbeaten ${h.champion.unbeaten_days} day${h.champion.unbeaten_days === 1 ? "" : "s"}</p>
+      <p style="color:var(--ink3);font-size:13px;margin-top:4px">Beat It score <b style="color:var(--gold)">${h.champion.score}%</b></p>
+      <div class="record-stands">${ic("clock", 13)} RECORD STANDS · ${h.champion.unbeaten_days} day${h.champion.unbeaten_days === 1 ? "" : "s"}${h.qualified ? ` · <b>${h.qualified}</b> qualified to break it` : ""}</div>
     </div>
     <button class="btn btn-gold" data-act="watch" data-vid="${h.champion.video_id}">${ic("play", 14)} WATCH THE WIN</button>
   </div>` : `
@@ -924,7 +927,12 @@ async function viewHome() {
   ${secHead("", "disc", "Records & champions", "permanent history — records exist to be broken", ["Full ranks", "#/leaderboard"])}
   <div class="records-grid">${d.champions.map(recordCard).join("")}</div>` : ""}
 
-  <div class="quote">“Maybe I don't have millions of followers. Maybe I'm not famous.<br>But I have something that is <em>uniquely mine</em>.”</div>`;
+  <div class="manifesto">
+    <div class="mf-line">Fame gets you <span>attention</span>.</div>
+    <div class="mf-line">Uniqueness gets you <em>remembered</em>.</div>
+    <div class="mf-line mf-core">Create something uniquely yours.</div>
+    <div class="mf-line">Then let the world try to <b>beat it</b>.</div>
+  </div>`;
 }
 
 function arenaCard(c) {
@@ -1495,12 +1503,13 @@ async function viewProfile(username) {
         <div class="pf-stat"><b>${u.following}</b><span>Following</span></div>
         <div class="pf-stat"><b>${st.attempts}</b><span>Attempts</span></div>
       </div>
-      <div class="pf-actcol">${followBtn || `<span></span>`}
-        ${own ? `<button class="pf-icobtn" data-nav="/settings" aria-label="Settings">${ic("gear", 18)}</button>${ME.is_admin ? `<button class="pf-icobtn" data-nav="/admin" aria-label="Admin">${ic("shield", 18)}</button>` : ""}` : `<button class="pf-icobtn" aria-label="Share">${ic("share", 17)}</button>`}
-      </div>
     </div>
     <div class="pf-name">${esc(u.display_name)} ${u.is_admin ? `<span class="pf-team">CREATEIT</span>` : ""}</div>
     <div class="pf-handle">@${esc(u.username)}</div>
+    <div class="pf-actions">
+      ${followBtn || (own ? "" : `<button class="btn btn-sm" style="flex:1">${ic("share", 14)} SHARE</button>`)}
+      ${own ? `<button class="btn btn-sm" data-nav="/settings" style="flex:1">${ic("gear", 14)} EDIT PROFILE</button>${ME.is_admin ? `<button class="pf-icobtn" data-nav="/admin" aria-label="Admin">${ic("shield", 17)}</button>` : ""}` : ""}
+    </div>
     ${u.bio ? `<div class="pf-bio">${esc(u.bio)}</div>` : (own ? "" : `<div class="pf-bio pf-bio-dim">No bio yet — too busy practicing.</div>`)}
     ${(d.badges || []).length ? `<div class="pf-ach">${d.badges.map(b => `<span class="pf-ach-item">${ic(b.icon, 13)} ${esc(b.label)}</span>`).join("")}</div>` : ""}
     ${socChips || (own ? `<button class="pf-addsoc" id="btn-edit-socials">${ic("plus", 12)} Link socials</button>` : "")}
@@ -1814,18 +1823,10 @@ async function viewSettings() {
       toast(`Theme set to ${o.dataset.theme.toUpperCase()}`);
     }));
     // avatar + color live pickers
-    let pickFace = ME.avatar, pickColor = ME.color;
-    const pv = $("#set-avatar-preview");
-    const refreshPv = () => { if (pv) { pv.textContent = pickFace; pv.style.background = pickColor; } };
-    $$("#set-faces .set-face").forEach(b => b.addEventListener("click", () => {
-      pickFace = b.dataset.face;
-      $$("#set-faces .set-face").forEach(x => x.classList.toggle("on", x === b));
-      refreshPv();
-    }));
+    let pickColor = ME.color;
     $$("#set-colors .set-color").forEach(b => b.addEventListener("click", () => {
       pickColor = b.dataset.c;
       $$("#set-colors .set-color").forEach(x => x.classList.toggle("on", x === b));
-      refreshPv();
     }));
     $("#set-photo-btn")?.addEventListener("click", () => $("#set-photo").click());
     $("#set-photo")?.addEventListener("change", async () => {
@@ -1853,7 +1854,7 @@ async function viewSettings() {
           display_name: $("#set-name").value.trim(), bio: $("#set-bio").value.trim(),
           username: ($("#set-username").value.trim().toLowerCase() || undefined),
           email: $("#set-email").value.trim(),
-          avatar: pickFace, color: pickColor } });
+          color: pickColor } });
         ME = { ...ME, ...d.me }; toast("Account saved."); renderChrome(); refreshMe();
       } catch (err) { toast(err.message, true); }
     });
@@ -1908,7 +1909,7 @@ async function viewSettings() {
   ${secHead("", "gear", "ACCOUNT", "")}
   <div class="set-card">
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px">
-      <span class="avatar lg" id="set-avatar-preview" style="background:${ME.color};font-size:34px">${ME.avatar}</span>
+      <span id="set-avatar-preview-wrap">${avatar(ME, "lg")}</span>
       <div style="font-size:12.5px;color:var(--ink3)">This is how you appear across CreateIt.</div>
     </div>
     <div class="field"><label>DISPLAY NAME</label><input class="input" id="set-name" value="${esc(ME.display_name)}" maxlength="40"></div>
@@ -1920,9 +1921,8 @@ async function viewSettings() {
         <input type="file" id="set-photo" accept="image/jpeg,image/png,image/webp" style="display:none">
         <button class="btn btn-sm" id="set-photo-btn">${ic("upload", 13)} UPLOAD REAL PHOTO</button>
         ${ME.avatar_photo ? `<button class="btn btn-sm" id="set-photo-rm">REMOVE PHOTO</button>` : ""}
-        <span class="set-note">Or pick a face below.</span>
+        <span class="set-note">No photo? Your initials are your mark.</span>
       </div>
-      <div class="set-faces" id="set-faces">${(window.SET_FACES||["😎","🤩","😊","😄","😇","🙂","🤗","😜","🥳","🤓","😏","😌","🕺","💃","🧑‍🎤","👩‍🎤"]).map(f => `<button type="button" class="set-face ${f===ME.avatar?"on":""}" data-face="${f}">${f}</button>`).join("")}</div>
     </div>
     <div class="field"><label>RING COLOR</label>
       <div class="set-colors" id="set-colors">${["#FF4D2E","#22D3A5","#7C5CFF","#FFB300","#5B8CFF","#FF6FB2"].map(c => `<button type="button" class="set-color ${c===ME.color?"on":""}" data-c="${c}" style="background:${c}"></button>`).join("")}</div>
@@ -1968,7 +1968,7 @@ async function viewSettings() {
   ${secHead("", "film", "ABOUT CREATEIT", "")}
   <div class="set-card">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">${logoSVG(34)}<div><b style="font-family:var(--display);font-weight:900;font-size:18px">CREATE<span style="color:var(--red)">IT</span></b><div class="set-note" style="margin:0">Create It · Recreate It · Beat It</div></div></div>
-    <p class="set-note">A platform where people create something unique, challenge the world to recreate it, and compete to beat it. Followers don't decide anything here — the challenge does.</p>
+    <p class="set-note">Fame gets you attention. Uniqueness gets you remembered. Create something uniquely yours — then let the world try to beat it.</p>
     <p class="set-note" style="margin-top:8px;font-family:var(--mono);font-size:9.5px;letter-spacing:.18em">BETA v17 · THE ARENA JOURNAL</p>
   </div>
 
