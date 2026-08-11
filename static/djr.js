@@ -76,6 +76,18 @@ async function viewDiscover(query) {
 }
 
 // ---------------- boot / lifecycle ----------------
+function djSwipeHint() {
+  try { if (sessionStorage.getItem("dj-hinted")) return; } catch (e) { return; }
+  try { sessionStorage.setItem("dj-hinted", "1"); } catch (e) {}
+  const djr = document.getElementById("djr");
+  if (!djr) return;
+  const hint = document.createElement("div");
+  hint.className = "dj-swipehint";
+  hint.innerHTML = `<span class="djsh-arr">${(typeof ic === "function") ? ic("arrow", 20) : "→"}</span><span>SWIPE</span>`;
+  djr.appendChild(hint);
+  setTimeout(() => hint.remove(), 2300);
+}
+
 async function djBoot() {
   const root = document.getElementById("djr");
   if (!root) return;
@@ -85,6 +97,7 @@ async function djBoot() {
   djArmPager();
   if (!DJ.videos.length) await djEnter({ type: "trending", label: "TRENDING" }, 0);
   else { djPaintWindow(); djCenter(); djActivateCurrent(); }
+  djSwipeHint();
 }
 
 function djTeardown() {
@@ -320,6 +333,7 @@ function djPreloadPoolSoon() {
 
 // ---------------- active video ----------------
 function djActivateCurrent() {
+  if (typeof haptic === "function") haptic(7);
   const win = djWin();
   if (!win) return;
   const slots = [...win.children];

@@ -2686,10 +2686,43 @@ window.addEventListener("hashchange", () => {
   route();
 });
 
+// ===== FIRST-LAUNCH ONBOARDING: the 5-second hook =====
+function maybeOnboard() {
+  try { if (localStorage.getItem("ci-onboarded")) return; } catch (e) { return; }
+  if (document.getElementById("onboard")) return;
+  const ob = document.createElement("div");
+  ob.id = "onboard";
+  ob.innerHTML = `
+    <div class="ob-aura"></div>
+    <div class="ob-core">
+      <div class="ob-logo">${logoSVG(64)}</div>
+      <div class="ob-word">CREATE<span>IT</span></div>
+      <div class="ob-stages">
+        <div class="ob-st"><span class="ob-n">1</span><b>CREATE IT</b></div>
+        <div class="ob-arrow">${ic("arrow", 15)}</div>
+        <div class="ob-st"><span class="ob-n">2</span><b>RECREATE IT</b></div>
+        <div class="ob-arrow">${ic("arrow", 15)}</div>
+        <div class="ob-st"><span class="ob-n">3</span><b>BEAT IT</b></div>
+      </div>
+      <div class="ob-tag">You don't need to be famous.<br>You need something <em>uniquely yours</em>.</div>
+      <button class="btn btn-fire ob-enter" id="ob-enter">ENTER THE ARENA ${ic("arrow", 15)}</button>
+      <button class="ob-skip" id="ob-skip">Skip</button>
+    </div>`;
+  document.body.appendChild(ob);
+  const done = () => {
+    try { localStorage.setItem("ci-onboarded", "1"); } catch (e) {}
+    ob.classList.add("out");
+    setTimeout(() => ob.remove(), 420);
+  };
+  document.getElementById("ob-enter").addEventListener("click", done);
+  document.getElementById("ob-skip").addEventListener("click", done);
+}
+
 (async function boot() {
   initNative();
   await refreshMe();
   bindTilt();
+  setTimeout(maybeOnboard, 1150);
   const path = (location.hash || "#/").slice(1).split("?")[0];
   if (path.startsWith("/video/")) openVideoRoute(path.split("/")[2]);
   else route();
