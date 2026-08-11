@@ -928,6 +928,16 @@ async function viewHome() {
   ${secHead("", "disc", "Records & champions", "permanent history — records exist to be broken", ["Hall of Records", "#/records"])}
   <div class="records-grid">${d.champions.map(recordCard).join("")}</div>` : ""}
 
+  <div class="hall-banner" data-nav="/records">
+    <div class="hall-b-glow"></div>
+    <div class="hall-b-ico">${ic("crown", 28)}</div>
+    <div class="hall-b-mid">
+      <div class="hall-b-t">HALL OF RECORDS</div>
+      <div class="hall-b-s">Who holds the records. How long they've stood. Come break one.</div>
+    </div>
+    <div class="hall-b-cta">ENTER ${ic("arrow", 15)}</div>
+  </div>
+
   <div class="manifesto">
     <div class="mf-line">Fame gets you <span>attention</span>.</div>
     <div class="mf-line">Uniqueness gets you <em>remembered</em>.</div>
