@@ -408,11 +408,17 @@ function djUpdateOverlay() {
     <div class="djr-kicker">${kicker}</div>
     <div class="djr-crow">
       <div class="djr-creator" data-nav="/user/${v.owner.username}">${avatar(v.owner, "sm")} <b>@${esc(v.owner.username)}</b></div>
-      ${ME && ME.username !== v.owner.username ? `<button class="djr-follow ${v.owner.you_follow ? "on" : ""}" data-follow="${esc(v.owner.username)}" data-follow-style="chip">${v.owner.you_follow ? "FOLLOWING ✓" : "FOLLOW"}</button>` : ""}
+      ${ME && ME.username !== v.owner.username ? (() => {
+        const f = (typeof FOLLOW_STATE !== "undefined" && v.owner.username in FOLLOW_STATE) ? FOLLOW_STATE[v.owner.username] : !!v.owner.you_follow;
+        return `<button class="djr-follow ${f ? "on" : ""}" data-follow="${esc(v.owner.username)}" data-follow-style="chip">${f ? "FOLLOWING ✓" : "FOLLOW"}</button>`;
+      })() : ""}
     </div>
     ${v.title ? `<div class="djr-title">${esc(v.title)}</div>` : ""}
     ${sub ? `<div class="djr-sub">${esc(sub)}</div>` : ""}`;
-  // follow handled globally via [data-follow]
+  // follow handled globally via [data-follow]; keep the global cache warm from fresh server data
+  if (typeof FOLLOW_STATE !== "undefined" && v.owner && v.owner.you_follow !== undefined && !(v.owner.username in FOLLOW_STATE)) {
+    FOLLOW_STATE[v.owner.username] = !!v.owner.you_follow;
+  }
   const cn = document.getElementById("djr-c-n");
   if (cn) cn.textContent = v.comments || 0;
   const ra = document.getElementById("djr-rate-avg");

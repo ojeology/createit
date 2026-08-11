@@ -76,7 +76,7 @@ function scoreBadge(score) {
 }
 
 function avatar(u, cls = "") {
-  if (u && u.you_follow !== undefined && u.username && typeof FOLLOW_STATE !== "undefined") FOLLOW_STATE[u.username] = !!u.you_follow;
+  if (u && u.you_follow !== undefined && u.username && typeof FOLLOW_STATE !== "undefined" && !(u.username in FOLLOW_STATE)) FOLLOW_STATE[u.username] = !!u.you_follow;
   if (u.avatar_photo) return `<span class="avatar ${cls} av-photo" style="border-color:${u.color}66"><img src="${u.avatar_photo}" alt=""></span>`;
   return `<span class="avatar ${cls}" style="background:${u.color}22;border-color:${u.color}55">${u.avatar}</span>`;
 }
@@ -1150,6 +1150,7 @@ async function viewCreate(query) {
       <input type="file" id="up-file" accept="video/mp4,video/webm,video/quicktime,.mkv" class="input">
       <div class="hint">mp4 / webm / mov · up to 256 MB · film the full attempt in one take when possible</div>
       <video id="up-preview" style="display:none;margin-top:10px;max-height:300px;border-radius:12px" controls muted playsinline></video>
+      <div class="up-progress" id="up-progress" style="display:none"><div id="up-progress-bar"></div><span id="up-progress-pct">0%</span></div>
     </div>
     <div class="field"><label>TITLE</label><input class="input" id="up-title" maxlength="120" placeholder="${kind === "creation" ? "e.g. The Impossible Trick" : "e.g. Attempt #4"}"></div>
     <div class="field"><label>DESCRIPTION</label><textarea class="input" id="up-desc" maxlength="400" placeholder="What makes this special?"></textarea></div>
@@ -1200,12 +1201,37 @@ async function viewCreate(query) {
         if (!cid) return toast("Pick a challenge.", true);
         fd.append("challenge_id", cid);
       } else if ($("#up-nominate")?.checked) fd.append("nominated", "1");
-      const btn = $("#up-submit"); btn.disabled = true; btn.textContent = "UPLOADING…";
-      try {
-        const d = await api("/api/upload", { method: "POST", body: fd });
-        toast(d.message);
-        location.hash = kind === "creation" ? "/" : `/video/${d.video_id}`;
-      } catch (err) { toast(err.message, true); btn.disabled = false; btn.textContent = "TRY AGAIN"; }
+      const btn = $("#up-submit"); btn.disabled = true; btn.textContent = "UPLOADING 0%";
+      const pw = $("#up-progress"); if (pw) pw.style.display = "flex";
+      const xhr = new XMLHttpRequest();
+      const tok = authToken();
+      xhr.open("POST", "/api/upload");
+      if (tok) xhr.setRequestHeader("X-CI-Token", tok);
+      xhr.upload.onprogress = e => {
+        if (!e.lengthComputable) return;
+        const pct = Math.round((e.loaded / e.total) * 100);
+        btn.textContent = `UPLOADING ${pct}%`;
+        const bar = $("#up-progress-bar"); if (bar) bar.style.width = pct + "%";
+        const pctEl = $("#up-progress-pct"); if (pctEl) pctEl.textContent = pct + "%";
+      };
+      xhr.onload = () => {
+        let d = {}; try { d = JSON.parse(xhr.responseText); } catch (e) {}
+        if (xhr.status >= 200 && xhr.status < 300) {
+          momentFlash(kind === "creation" ? "YOUR CREATION IS LIVE" : kind === "beatit" ? "FINAL SUBMISSION LOCKED" : "YOUR ATTEMPT IS IN",
+                      kind === "creation" ? "CreateIt and the Arena are watching." : "CreateIt evaluators are on it. Your journey grows.");
+          setTimeout(() => { location.hash = kind === "creation" ? "/" : `/video/${d.video_id}`; }, 1250);
+        } else {
+          toast(d.error || "Something went wrong. Try again.", true);
+          btn.disabled = false; btn.textContent = "TRY AGAIN";
+          if (pw) pw.style.display = "none";
+        }
+      };
+      xhr.onerror = () => {
+        toast("Network trouble — check your connection and try again.", true);
+        btn.disabled = false; btn.textContent = "TRY AGAIN";
+        if (pw) pw.style.display = "none";
+      };
+      xhr.send(fd);
     });
   }, 0);
 
@@ -2317,6 +2343,20 @@ function statusBanner(c) {
 
 // ---------------- signature moments ----------------
 const MOMENTS = new Set();
+function momentFlash(title, sub) {
+  const root = document.getElementById("modal-root");
+  if (!root) return;
+  root.insertAdjacentHTML("beforeend", `<div class="moment-flash" id="moment-flash">
+    <div class="mf-core">
+      ${logoSVG(46)}
+      <div class="mf-t">${title}</div>
+      <div class="mf-s">${sub}</div>
+    </div>
+  </div>`);
+  setTimeout(() => { const m = document.getElementById("moment-flash"); if (m) m.classList.add("out"); }, 1050);
+  setTimeout(() => { const m = document.getElementById("moment-flash"); if (m) m.remove(); }, 1400);
+}
+
 function showMoment(pct, vid) {
   if (vid && MOMENTS.has(vid)) return;
   if (vid) MOMENTS.add(vid);

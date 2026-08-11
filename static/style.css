@@ -2667,3 +2667,49 @@ body:has(#djr) #backbtn, body:has(.player) #backbtn{display:none !important}
 [data-follow]:active{transform:scale(.94)}
 [data-follow].on{background:rgba(31,122,92,.16);color:var(--green);border-color:rgba(31,122,92,.45)}
 .djr-follow[data-follow].on{background:rgba(31,122,92,.9);color:#fff}
+
+/* ============================================================
+   v32 — AGGRESSIVE POLISH: feedback, tap targets, consistency
+   ============================================================ */
+/* upload progress */
+.up-progress{display:flex;align-items:center;gap:12px;margin-top:12px;position:relative;height:26px;
+  background:var(--paper3);border-radius:999px;overflow:hidden;border:1px solid var(--line)}
+.up-progress>div:first-child{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--grad-fire);transition:width .2s ease}
+.up-progress span{position:relative;z-index:1;margin-left:auto;margin-right:14px;font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--ink2)}
+
+/* submission success moment */
+.moment-flash{position:fixed;inset:0;z-index:140;background:rgba(8,9,12,.92);backdrop-filter:blur(10px);
+  display:flex;align-items:center;justify-content:center;animation:mf-in .3s cubic-bezier(.2,1,.3,1)}
+.moment-flash.out{opacity:0;transition:opacity .3s ease}
+.mf-core{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;padding:20px;animation:mf-pop .5s cubic-bezier(.2,1.4,.3,1)}
+.mf-core svg{filter:drop-shadow(0 0 24px rgba(225,78,42,.4))}
+.mf-t{font-family:var(--display);font-weight:900;font-size:clamp(24px,6vw,34px);color:#fff;letter-spacing:.02em}
+.mf-s{font-size:13px;color:rgba(236,238,241,.7)}
+@keyframes mf-in{from{opacity:0}to{opacity:1}}
+@keyframes mf-pop{0%{transform:scale(.8);opacity:0}100%{transform:scale(1);opacity:1}}
+
+/* tap targets: nothing below comfortable touch size */
+.btn-sm{min-height:40px}
+.mini-btn{min-height:36px}
+.chip{min-height:36px}
+.bn-item{min-width:56px}
+.djr-act{min-height:60px}
+
+/* follow/achievement entrances */
+.badge-row{animation:view-in .45s cubic-bezier(.2,.8,.3,1) both}
+@keyframes view-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* consistent focus visibility (accessibility) */
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{
+  outline:2px solid var(--red);outline-offset:2px}
+
+/* live pulse on home rails */
+.sec .more{display:inline-flex;align-items:center;gap:6px}
+
+/* error states: consistent voice */
+.err-block{padding:60px 24px;text-align:center}
+.err-block p{color:var(--ink3);font-size:14px;line-height:1.6}
+
+/* type hierarchy tightening */
+.big-title{letter-spacing:.01em}
+.meta-row{line-height:1.6}
