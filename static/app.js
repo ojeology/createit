@@ -1516,34 +1516,72 @@ async function viewRecords() {
   `;
 }
 
+function lbPodium(top) {
+  if (!top.length) return "";
+  const order = [top[1], top[0], top[2]];   // silver, gold, bronze
+  const place = { 0: 2, 1: 1, 2: 3 };
+  const hts = { 1: 118, 2: 92, 3: 74 };
+  return `<div class="lb-podium">
+    ${order.map((t, i) => t ? `
+      <div class="lb-pod lb-p${place[i]}">
+        <div class="lb-pod-av">${avatar(t.user, "lg")}${place[i] === 1 ? `<span class="lb-crown">${ic("crown", 18)}</span>` : ""}</div>
+        <div class="lb-pod-name" data-nav="/user/${t.user.username}">@${esc(t.user.username)}</div>
+        <div class="lb-pod-best">${t.best}<em>%</em></div>
+        <div class="lb-pod-pillar" style="height:${hts[place[i]]}px"><span>${place[i]}</span></div>
+      </div>` : `<div class="lb-pod lb-empty"></div>`).join("")}
+  </div>`;
+}
+
 async function viewLeaderboard() {
   const d = await api("/api/leaderboard");
+  const top = d.top || [];
+  const rest = top.slice(3);
   return `
-  <div class="page-head"><span class="crumb">RANKS / HALL OF FAME</span><h1 class="big-title">LEADERBOARD</h1>
-  <div class="meta-row">Performance over popularity. A 200-follower account can sit above 2 million.</div></div>
-  <div class="sec" style="margin-top:6px"><h2>${ic("target",18)} TOP PARTICIPANTS</h2><span class="sub">best recreate score, all challenges</span><span class="sec-rule"></span></div>
-  ${d.top.map((t, i) => `
-    <div class="board-row"><span class="rank">${i + 1}</span>${avatar(t.user, "sm")}
-      <div class="mid"><div class="t" data-nav="/user/${t.user.username}" style="cursor:pointer">@${esc(t.user.username)} · ${esc(t.user.display_name)}</div>
-      <div class="s">${t.attempts} total attempts · best on ${t.challenge_code ? `<a href="#/challenge/${t.challenge_id}" style="color:var(--ice)">${esc(t.challenge_code)}</a>` : "—"}</div></div>
+  <div class="page-head"><span class="crumb">RANKS</span><h1 class="big-title">LEADERBOARD</h1>
+  <div class="meta-row">Performance over popularity. A 200-follower account can outrank 2 million.</div></div>
+
+  <div class="lb-sec">${ic("trophy", 15)} TOP COMPETITORS <em>best recreate score</em></div>
+  ${lbPodium(top)}
+  ${rest.length ? `<div class="lb-list">
+    ${rest.map((t, i) => `
+    <div class="lb-row">
+      <span class="lb-rank">${i + 4}</span>
+      ${avatar(t.user, "sm")}
+      <div class="lb-mid">
+        <div class="lb-name" data-nav="/user/${t.user.username}">@${esc(t.user.username)}</div>
+        <div class="lb-sub">${t.attempts} attempts${t.challenge_code ? ` · best on ${esc(t.challenge_code)}` : ""}</div>
+      </div>
       ${scoreBadge(t.best)}
-    </div>`).join("") || `<div class="empty">No scored attempts yet.</div>`}
-  <div class="sec"><h2>${ic("crown",18)} PAST CHAMPIONS</h2><span class="sub">permanently linked to their challenges</span><span class="sec-rule"></span></div>
-  ${d.champions.map(c => `
-    <div class="board-row"><span class="rank" style="color:var(--gold)">${ic("crown",16)}</span>${avatar(c.champion, "sm")}
-      <div class="mid"><div class="t">@${esc(c.champion.username)}</div><div class="s">${esc(c.challenge.code)} — ${esc(c.challenge.title)} · crowned ${timeAgo(c.at)}</div></div>
-      ${scoreBadge(c.score)} <button class="btn btn-sm" data-nav="/challenge/${c.challenge.id}">VIEW</button>
-    </div>`).join("") || `<div class="empty">No champions crowned yet.</div>`}
-  <div class="sec"><h2>${ic("disc",18)} RECORDS</h2><span class="sub">unbeaten marks. come break them.</span><span class="sec-rule"></span></div>
-  <div class="grid3" style="grid-template-columns:repeat(auto-fill,minmax(230px,1fr))">
-  ${d.records.map(r => `<div class="records-card">
-      <span class="rc-code">${esc(r.challenge.code)}</span>
-      <div style="font-family:var(--display);letter-spacing:1px;font-size:17px">${esc(r.challenge.title)}</div>
-      <div class="meta-row" style="font-size:12.5px">${avatar(r.holder, "sm")} @${esc(r.holder.username)}</div>
-      <div style="display:flex;align-items:center;gap:10px">${scoreBadge(r.score)}<span style="color:var(--mut);font-size:12px">unbeaten for ${r.unbeaten_days} day${r.unbeaten_days === 1 ? "" : "s"}</span></div>
-      <button class="btn btn-sm btn-ghost" data-nav="/challenge/${r.challenge.id}" style="align-self:flex-start">VIEW CHALLENGE →</button>
-    </div>`).join("") || `<div class="empty">No records set yet.</div>`}
-  </div>`;
+    </div>`).join("")}
+  </div>` : ""}
+  ${!top.length ? `<div class="empty">${ic("trophy", 24)}<br>No scored attempts yet. Set the first mark.</div>` : ""}
+
+  <div class="lb-sec" style="margin-top:38px">${ic("crown", 15)} CHAMPIONS <em>permanently linked to their challenge</em></div>
+  ${(d.champions || []).length ? `<div class="lb-list">
+    ${d.champions.map(c => `
+    <div class="lb-row lb-champ">
+      <span class="lb-rank lb-rank-gold">${ic("crown", 16)}</span>
+      ${avatar(c.champion, "sm")}
+      <div class="lb-mid">
+        <div class="lb-name">@${esc(c.champion.username)}</div>
+        <div class="lb-sub">${esc(c.challenge.code)} — ${esc(c.challenge.title)} · crowned ${timeAgo(c.at)}</div>
+      </div>
+      ${scoreBadge(c.score)}
+      <button class="btn btn-sm lb-view" data-nav="/challenge/${c.challenge.id}">VIEW</button>
+    </div>`).join("")}
+  </div>` : `<div class="empty">${ic("crown", 24)}<br>No champions crowned yet.</div>`}
+
+  <div class="lb-sec" style="margin-top:38px">${ic("disc", 15)} RECORDS <em>unbeaten marks — come break them</em></div>
+  ${(d.records || []).length ? `<div class="lb-records">
+    ${d.records.map(r => `
+    <div class="lb-rec">
+      <div class="lb-rec-top"><span class="lb-rec-code">${esc(r.challenge.code)}</span><span class="lb-rec-days">${ic("clock", 11)} ${r.unbeaten_days}d unbeaten</span></div>
+      <div class="lb-rec-title">${esc(r.challenge.title)}</div>
+      <div class="lb-rec-holder">${avatar(r.holder, "sm")} <span>@${esc(r.holder.username)}</span><b>${r.score}%</b></div>
+      <button class="btn btn-sm btn-fire lb-rec-cta" data-nav="/challenge/${r.challenge.id}">BREAK IT ${ic("arrow", 12)}</button>
+    </div>`).join("")}
+  </div>` : `<div class="empty">${ic("disc", 24)}<br>No records set yet.</div>`}
+  `;
 }
 
 // ---------------- socials icons ----------------
@@ -2755,7 +2793,7 @@ function heroViewGate() {
   hv.dataset.gated = "1";
   new IntersectionObserver(es => es.forEach(en => {
     if (en.isIntersecting) { if (!hv.__userPaused) hv.play().catch(() => {}); }
-    else { hv.pause(); }
+    else { hv.pause(); hv.muted = true; }
   }), { threshold: 0.2 }).observe(hv);
 }
 
@@ -2789,7 +2827,16 @@ function routeLine() {
   requestAnimationFrame(() => { l.style.width = "72%"; });
   setTimeout(() => { l.classList.add("done"); setTimeout(() => l.classList.add("hide"), 220); }, 350);
 }
+// GLOBAL AUDIO KILL: no sound ever follows you between pages
+function killAllAudio() {
+  document.querySelectorAll("video").forEach(v => { try { v.pause(); v.muted = true; } catch (e) {} });
+  const ps = document.querySelector(".p-sound");
+  if (ps) { ps.innerHTML = ic("volumeX", 20); ps.classList.remove("on"); }
+}
+window.killAllAudio = killAllAudio;
+
 async function route() {
+  killAllAudio();
   if (PLAYER_OPEN) closePlayer();
   if (typeof djTeardown === "function") djTeardown();
   routeLine();
