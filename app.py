@@ -611,9 +611,35 @@ def home():
     feed_create = videos_pub(qa("SELECT * FROM videos WHERE kind='creation' AND status='approved' ORDER BY id DESC LIMIT 10"), me)
     feed_recreate = videos_pub(qa("SELECT * FROM videos WHERE kind='recreate' AND status='approved' AND score>=100 ORDER BY id DESC LIMIT 10"), me)
     feed_beatit = videos_pub(qa("SELECT * FROM videos WHERE kind='beatit' AND status='approved' ORDER BY id DESC LIMIT 10"), me)
+    # LIVE RECORD CHASES — records currently under attack
+    chase_rows = qa("""SELECT * FROM challenges WHERE stage IN ('recreate_closed','beat_it','judging')
+                       AND champion_id IS NOT NULL ORDER BY id DESC""")
+    live_chases = []
+    for c in chase_rows:
+        attackers = q1("SELECT COUNT(*) n FROM videos WHERE challenge_id=? AND kind='beatit'", (c["id"],))["n"]
+        if not attackers:
+            continue
+        live_chases.append({
+            "challenge": {"id": c["id"], "code": c["code"], "title": c["title"], "stage": c["stage"]},
+            "record_holder": user_pub(c["champion_id"]), "record_score": c["champion_score"],
+            "attackers": attackers,
+        })
+    # NEW CHAMPIONS — recent crowns for the ceremony hook
+    cutoff = (datetime.datetime.utcnow() - datetime.timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    newc_rows = qa("SELECT * FROM challenges WHERE stage='champion' AND champion_at >= ? ORDER BY champion_at DESC LIMIT 3", (cutoff,))
+    new_champions = []
+    for c in newc_rows:
+        prev = q1("SELECT * FROM champions_history WHERE challenge_id=? ORDER BY achieved_at DESC LIMIT 1", (c["id"],))
+        new_champions.append({
+            "challenge": {"id": c["id"], "code": c["code"], "title": c["title"]},
+            "new": {**user_pub(c["champion_id"]), "score": c["champion_score"], "video_id": c["champion_video_id"]},
+            "prev": {**user_pub(prev["user_id"]), "score": prev["score"]} if prev else None,
+            "at": c["champion_at"],
+        })
     return jsonify(hero=hero, live=live, beat=beat, trending=trending, discover=discover, champions=champs,
                    hero_feed=hero_feed, hero_success=hero_success, beat_feed=beat_feed, feed_create=feed_create,
-                   feed_recreate=feed_recreate, feed_beatit=feed_beatit, sponsored=sponsored)
+                   feed_recreate=feed_recreate, feed_beatit=feed_beatit, sponsored=sponsored,
+                   live_chases=live_chases, new_champions=new_champions)
 
 @app.get("/api/challenges")
 def challenges_list():

@@ -844,10 +844,75 @@ function ciRailInit(id, vids) {
   activate();
 }
 
+// ===== CHAMPION CEREMONY: the cinematic record-break moment =====
+function championCeremony(nc) {
+  const root = document.getElementById("modal-root");
+  if (!root) return;
+  root.insertAdjacentHTML("beforeend", `
+    <div class="cere" id="cere">
+      <div class="cere-sparks" id="cere-sparks"></div>
+      <div class="cere-glow"></div>
+      <div class="cere-core">
+        <div class="cere-k">A NEW CHAMPION IS CROWNED</div>
+        <div class="cere-crown">${ic("crown", 54)}</div>
+        <div class="cere-new">${avatar(nc.new, "xl")}<div class="cere-name">@${esc(nc.new.username)}</div></div>
+        <div class="cere-score">${nc.new.score}<em>%</em></div>
+        <div class="cere-ch">${esc(nc.challenge.code)} · ${esc(nc.challenge.title)}</div>
+        ${nc.prev ? `<div class="cere-dethrone">${ic("arrow", 13)} dethrones @${esc(nc.prev.username)} (${nc.prev.score}%)</div>` : `<div class="cere-dethrone">the first to claim it</div>`}
+        <button class="btn btn-gold cere-watch" data-act="watch" data-vid="${nc.new.video_id}">${ic("play", 15)} WATCH THE WIN</button>
+        <button class="cere-close" id="cere-close">Continue</button>
+      </div>
+    </div>`);
+  // spark burst
+  const sp = document.getElementById("cere-sparks");
+  for (let i = 0; i < 34; i++) {
+    const p = document.createElement("span");
+    p.className = "cere-spark";
+    const a = Math.random() * Math.PI * 2, r = 90 + Math.random() * 200;
+    p.style.setProperty("--dx", Math.cos(a) * r + "px");
+    p.style.setProperty("--dy", Math.sin(a) * r - 60 + "px");
+    p.style.animationDelay = (Math.random() * 0.4) + "s";
+    p.style.background = Math.random() > 0.5 ? "#f5c518" : "#ff8a3c";
+    sp.appendChild(p);
+  }
+  const close = () => { const c = document.getElementById("cere"); if (c) { c.classList.add("out"); setTimeout(() => c.remove(), 380); } };
+  document.getElementById("cere-close").addEventListener("click", close);
+  document.getElementById("cere").addEventListener("click", e => { if (e.target.id === "cere") close(); });
+  document.addEventListener("click", function watchClose(e) {
+    if (e.target.closest(".cere-watch")) { document.removeEventListener("click", watchClose); close(); }
+  });
+}
+
+// ===== LIVE RECORD-CHASE banner =====
+function liveChaseHTML(chases) {
+  if (!chases.length) return "";
+  return `
+  <div class="chase-wrap">
+    <div class="chase-sec"><span class="chase-live"><i></i> LIVE</span> RECORDS UNDER ATTACK</div>
+    ${chases.map(c => `
+    <div class="chase-card" data-nav="/challenge/${c.challenge.id}">
+      <div class="chase-pulse"></div>
+      <div class="chase-mid">
+        <div class="chase-t">${esc(c.challenge.title)} <span>${esc(c.challenge.code)}</span></div>
+        <div class="chase-s">${ic("crown", 12)} @${esc(c.record_holder.username)} holds <b>${c.record_score}%</b> · ${c.attackers} attacker${c.attackers > 1 ? "s" : ""} closing in</div>
+      </div>
+      <div class="chase-cta">WATCH ${ic("arrow", 14)}</div>
+    </div>`).join("")}
+  </div>`;
+}
+
 async function viewHome() {
   const d = await api("/api/home");
   HOME_DATA = d;
   const h = d.hero;
+  window.__NEWCHAMP = d.new_champions || [];
+  setTimeout(() => {
+    const ncb = document.getElementById("newchamp-banner");
+    if (ncb) ncb.addEventListener("click", () => {
+      const nc = window.__NEWCHAMP[0];
+      if (nc && typeof championCeremony === "function") { if (typeof haptic === "function") haptic([20, 50, 20]); championCeremony(nc); }
+    });
+  }, 0);
   setTimeout(() => { ciRailInit("rail-rec", d.hero_success); ciRailInit("rail-beat", d.beat_feed); loadPeopleStrip(); }, 0);
   if (typeof regList === "function") {
     if (h) regList("home-hero", [h.original_video]);
@@ -929,6 +994,13 @@ async function viewHome() {
   ${secHead("", "disc", "Records & champions", "permanent history — records exist to be broken", ["Hall of Records", "#/records"])}
   <div class="records-grid">${d.champions.map(recordCard).join("")}</div>` : ""}
 
+  ${(d.live_chases && d.live_chases.length) ? liveChaseHTML(d.live_chases) : ""}
+  ${(d.new_champions && d.new_champions.length) ? `
+  <div class="newchamp-banner" id="newchamp-banner">
+    <span class="ncb-crown">${ic("crown", 20)}</span>
+    <div class="ncb-mid"><b>NEW CHAMPION</b><span>@${esc(d.new_champions[0].new.username)} just took ${esc(d.new_champions[0].challenge.code)}</span></div>
+    <span class="ncb-cta">PLAY THE CROWNING ${ic("arrow", 13)}</span>
+  </div>` : ""}
   <div class="hall-banner" data-nav="/records">
     <div class="hall-b-glow"></div>
     <div class="hall-b-ico">${ic("crown", 28)}</div>
@@ -1501,6 +1573,25 @@ function profTile(v) {
   </div>`;
 }
 
+function journeyLine(attempts, beatit) {
+  const pts = attempts.filter(a => a.score != null).map(a => a.score);
+  if (beatit && beatit.score != null) pts.push(Math.min(100, beatit.score));
+  if (!pts.length) return "";
+  const w = 100, h = 34;
+  const step = pts.length > 1 ? w / (pts.length - 1) : 0;
+  const coords = pts.map((p, i) => `${(i * step).toFixed(1)},${(h - 3 - (Math.min(p, 100) / 100) * (h - 6)).toFixed(1)}`).join(" ");
+  const last = coords.split(" ").pop().split(",");
+  return `<div class="jline-wrap">
+    <svg class="jline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+      <polyline class="jline-path" points="${coords}" fill="none" stroke="url(#jgrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <defs><linearGradient id="jgrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#ff4d2e"/><stop offset="1" stop-color="#f5c518"/></linearGradient></defs>
+    </svg>
+    <span class="jline-dot" style="left:${last[0]}%;top:${(last[1] / h * 100).toFixed(1)}%"></span>
+    <span class="jline-lbl">0%</span><span class="jline-lbl jline-top">100%</span>
+  </div>`;
+}
+
 function profTabHTML(tab) {
   const d = PROF;
   if (tab === "creations") {
@@ -1547,6 +1638,7 @@ function profTabHTML(tab) {
         <div class="j-head"><h3 data-nav="/challenge/${j.challenge.id}" style="cursor:pointer">${esc(j.challenge.code)} — ${esc(j.challenge.title)}</h3>
           ${stagePill(j.challenge.stage)} ${j.won ? `<span class="pill-mini pm-gold">${ic("crown", 10)} CHAMPION</span>` : j.completed ? `<span class="pill-mini pm-teal">${ic("check", 10)} COMPLETED</span>` : `<span class="pill-mini pm-violet">RECREATING</span>`}
         </div>
+        ${journeyLine(j.attempts, j.beatit)}
         <div class="ar-stats" style="margin:12px 0 4px;max-width:420px">
           <div class="ars"><span class="ars-v">${j.attempts.length}</span><span class="ars-k">Attempts</span></div>
           <div class="ars"><span class="ars-v">${Math.max(...j.attempts.map(a => a.score || 0), 0)}%</span><span class="ars-k">Best score</span></div>
@@ -1634,7 +1726,11 @@ async function viewProfile(username) {
       ${own ? `<button class="btn btn-sm" data-nav="/settings" style="flex:1">${ic("gear", 14)} EDIT PROFILE</button>${ME.is_admin ? `<button class="pf-icobtn" data-nav="/admin" aria-label="Admin">${ic("shield", 17)}</button>` : ""}` : ""}
     </div>
     ${u.bio ? `<div class="pf-bio">${esc(u.bio)}</div>` : (own ? "" : `<div class="pf-bio pf-bio-dim">No bio yet — too busy practicing.</div>`)}
-    ${(d.badges || []).length ? `<div class="pf-ach">${d.badges.map(b => `<span class="pf-ach-item">${ic(b.icon, 13)} ${esc(b.label)}</span>`).join("")}</div>` : ""}
+    ${(d.badges || []).length ? `
+    <div class="trophy-shelf">
+      <div class="ts-label">${ic("trophy", 14)} ACHIEVEMENTS</div>
+      <div class="ts-items">${d.badges.map(b => `<div class="ts-item">${ic(b.icon, 20)}<span>${esc(b.label)}</span></div>`).join("")}</div>
+    </div>` : ""}
     ${socChips || (own ? `<button class="pf-addsoc" id="btn-edit-socials">${ic("plus", 12)} Link socials</button>` : "")}
   </div>
   ${own ? `<div id="socials-form" style="display:none;gap:8px;flex-wrap:wrap;margin:10px 0;max-width:640px">
@@ -1814,6 +1910,23 @@ async function renderSearchResults(body, q) {
   } catch (e) { body.innerHTML = `<div class="empty">Search failed — try again.</div>`; }
 }
 
+function catPodium(videos) {
+  const scored = (videos || []).filter(v => v.score != null).sort((a, b) => b.score - a.score).slice(0, 3);
+  if (!scored.length) return "";
+  const order = [scored[1], scored[0], scored[2]];  // silver, gold, bronze layout
+  const place = { 0: 2, 1: 1, 2: 3 };
+  return `
+  <div class="podium-sec">${ic("trophy", 15)} TOP IN THIS ARENA</div>
+  <div class="podium">
+    ${order.map((v, i) => v ? `
+      <div class="pod p${place[i]}" data-act="open-video" data-vid="${v.id}">
+        <div class="pod-medal">${place[i] === 1 ? ic("crown", 18) : place[i]}</div>
+        <div class="pod-thumb">${v.poster ? `<img src="${v.poster}" alt="">` : ""}<span class="pod-score">${v.score}%</span></div>
+        <div class="pod-by">@${esc(v.owner.username)}</div>
+      </div>` : `<div class="pod pod-empty"></div>`).join("")}
+  </div>`;
+}
+
 async function viewCategory(slug) {
   const d = await api(`/api/category/${encodeURIComponent(slug)}`).catch(() => null);
   if (!d) return `<div class="err-block"><h3>THIS TOPIC HAS LEFT THE ARENA</h3><p>It may have been renamed.</p><br><button class="btn btn-fire" data-nav="/discover">BACK TO DISCOVERY</button></div>`;
@@ -1824,6 +1937,7 @@ async function viewCategory(slug) {
     <h1 class="big-title">${esc(d.category.name).toUpperCase()}</h1>
     <div class="meta-row">${d.challenges.length} challenge${d.challenges.length === 1 ? "" : "s"} · ${d.videos.length} videos${d.category.parent ? ` · under ${esc(d.category.parent)}` : ""}</div>
   </div>
+  ${catPodium(d.videos)}
   ${d.challenges.length ? `${secHead("", "flame", "CHALLENGES", "")}<div class="arena-grid">${d.challenges.map(arenaCard).join("")}</div>` : ""}
   ${d.videos.length ? `${secHead("", "eye", "VIDEOS", "")}<div class="grid3" data-vlist="cat-${d.category.slug}" data-vlabel="${esc(d.category.name).toUpperCase()}">${d.videos.map(v => videoCard(v)).join("")}</div>`
     : `<div class="empty">Nothing in this topic yet — be the first to CREATE IT.</div>`}`;
