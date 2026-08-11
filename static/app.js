@@ -877,6 +877,7 @@ async function viewHome() {
           <button class="btn hero-open" data-nav="/challenge/${h.id}">${h.stage === "champion" ? "VIEW RECORD" : "OPEN CHALLENGE"} ${ic("arrow", 13)}</button>
         </div>
       </div>
+      <button class="p-sound" data-act="hero-sound" aria-label="Toggle sound">${ic("volumeX", 20)}</button>
     </div>
     <div class="hero-stats">
       <div class="hs"><b data-count="${h.attempts_total}">0</b><span>attempts</span></div>
@@ -1332,6 +1333,27 @@ async function viewCreate(query) {
   return `${back}<div class="page-head"><h1 class="big-title" style="font-size:30px">${heads[kind][0]}</h1><div class="meta-row">${heads[kind][1]}</div></div>${form(extra)}`;
 }
 
+function legendRow(l, i) {
+  const st = l.stats; const rank = i + 1;
+  const ach = [];
+  if (st.records_now) ach.push(`<span class="hof-ach gold">${ic("crown", 12)} ${st.records_now} RECORD${st.records_now > 1 ? "S" : ""}</span>`);
+  if (st.records_past) ach.push(`<span class="hof-ach gold2">${ic("disc", 12)} ${st.records_past} PAST REIGN${st.records_past > 1 ? "S" : ""}</span>`);
+  if (st.completed) ach.push(`<span class="hof-ach teal">${ic("check", 12)} ${st.completed} RECREATED</span>`);
+  if (st.beatit) ach.push(`<span class="hof-ach fire">${ic("zap", 12)} ${st.beatit} BEAT IT</span>`);
+  if (st.created) ach.push(`<span class="hof-ach violet">${ic("film", 12)} ${st.created} CREATED</span>`);
+  return `
+  <div class="hof-row${rank <= 3 ? " hof-podium" : ""}" data-hof="${i}">
+    <div class="hof-rank${rank <= 3 ? " top" : ""}">${rank <= 3 ? ic("crown", 15) : rank}</div>
+    ${avatar(l.user, "md")}
+    <div class="hof-mid">
+      <div class="hof-name">${esc(l.user.display_name)} <span>@${esc(l.user.username)}</span></div>
+      <div class="hof-achs">${ach.join("") || `<span class="hof-ach">${ic("spark", 12)} RISING</span>`}</div>
+    </div>
+    <div class="hof-fame"><b>${l.fame}</b><span>FAME</span></div>
+    <div class="hof-play">${ic("play", 17)}</div>
+  </div>`;
+}
+
 function hrCard(r, isLongest) {
   return `
   <div class="hr2-card${isLongest ? " hr2-longest" : ""}">
@@ -1361,7 +1383,7 @@ function hrCard(r, isLongest) {
   </div>`;
 }
 function renderRecordsList(records, longestId) {
-  if (!records.length) return `<div class="empty">${ic("disc", 24)}<br>No records match. The arena is waiting.</div>`;
+  if (!records.length) return `<div class="empty">${ic("disc", 24)}<br>No records yet. The arena is waiting.</div>`;
   return `<div class="hr2-grid">${records.map(r => hrCard(r, r.challenge.id === longestId)).join("")}</div>`;
 }
 function hallFilter(q) {
@@ -1372,28 +1394,44 @@ function hallFilter(q) {
 }
 
 async function viewRecords() {
-  const d = await api("/api/records");
-  window.__RECORDS = d.records;
-  window.__LONGEST_ID = d.longest ? d.longest.challenge.id : null;
-  const totalChallengers = d.records.reduce((a, r) => a + (r.challengers || 0), 0);
+  const [fam, rec] = await Promise.all([api("/api/hall-of-fame").catch(() => ({ legends: [] })), api("/api/records")]);
+  window.__RECORDS = rec.records;
+  window.__LONGEST_ID = rec.longest ? rec.longest.challenge.id : null;
+  window.__LEGENDS = fam.legends || [];
+  const legends = window.__LEGENDS;
+  const totalChallengers = rec.records.reduce((a, r) => a + (r.challengers || 0), 0);
   setTimeout(() => {
     const inp = document.getElementById("hall-search");
     if (inp) inp.addEventListener("input", () => hallFilter(inp.value.trim().toLowerCase()));
+    document.querySelectorAll("[data-hof]").forEach(row => row.addEventListener("click", () => {
+      const l = legends[+row.dataset.hof];
+      if (!l) return;
+      if (!l.videos.length) { toast("@" + l.user.username + " has no public achievements yet."); return; }
+      if (typeof haptic === "function") haptic(14);
+      if (typeof openViewer === "function") openViewer(l.videos, 0, "@" + l.user.username.toUpperCase() + " · ACHIEVEMENTS");
+      else location.hash = "/user/" + l.user.username;
+    }));
   }, 0);
   return `
   <div class="hall-hero">
     <div class="hall-hero-glow"></div>
     <div class="hall-hero-crown">${ic("crown", 38)}</div>
-    <h1 class="hall-hero-t">HALL OF RECORDS</h1>
-    <div class="hall-hero-s">Permanent. Breakable. Historic.</div>
+    <h1 class="hall-hero-t">HALL OF FAME</h1>
+    <div class="hall-hero-s">The legends. Their records. Their story on autoplay.</div>
     <div class="hall-stats">
-      <div class="hall-stat"><b>${d.records.length}</b><span>Records</span></div>
-      <div class="hall-stat"><b>${d.longest ? d.longest.champion.unbeaten_days + "d" : "—"}</b><span>Longest reign</span></div>
+      <div class="hall-stat"><b>${legends.length}</b><span>Legends</span></div>
+      <div class="hall-stat"><b>${rec.records.length}</b><span>Records</span></div>
       <div class="hall-stat"><b>${totalChallengers}</b><span>Challengers</span></div>
     </div>
     <div class="hall-search">${ic("target", 18)}<input id="hall-search" placeholder="Search records, champions, challenges…" autocomplete="off"></div>
   </div>
-  <div id="hall-list">${renderRecordsList(d.records, window.__LONGEST_ID)}</div>
+
+  <div class="hof-sec"><span>${ic("crown", 16)}</span> LEGENDS <em>tap a name — their achievements autoplay</em></div>
+  ${legends.length ? `<div class="hof-list">${legends.map((l, i) => legendRow(l, i)).join("")}</div>`
+    : `<div class="empty">${ic("crown", 24)}<br>No legends yet. Set a record and claim your place.</div>`}
+
+  <div class="hof-sec" style="margin-top:34px"><span>${ic("disc", 16)}</span> RECORDS</div>
+  <div id="hall-list">${renderRecordsList(rec.records, window.__LONGEST_ID)}</div>
   `;
 }
 

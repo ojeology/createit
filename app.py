@@ -1164,6 +1164,36 @@ def discover_feed():
     return jsonify(videos=videos_pub(rows, me), filter=f)
 
 # ---------------------------------------------------------------- leaderboard & records
+@app.get("/api/hall-of-fame")
+def hall_of_fame():
+    me = current_user()
+    users = qa("SELECT id FROM users ORDER BY id")
+    out = []
+    for u in users:
+        uid = u["id"]
+        records_now = q1("SELECT COUNT(*) c FROM challenges WHERE champion_id=?", (uid,))["c"]
+        records_past = q1("SELECT COUNT(*) c FROM champions_history WHERE user_id=?", (uid,))["c"]
+        completed = q1("SELECT COUNT(DISTINCT challenge_id) c FROM videos WHERE user_id=? AND kind='recreate' AND score>=100", (uid,))["c"]
+        beatit = q1("SELECT COUNT(*) c FROM videos WHERE user_id=? AND kind='beatit' AND score IS NOT NULL", (uid,))["c"]
+        created = q1("SELECT COUNT(*) c FROM challenges WHERE creator_id=?", (uid,))["c"]
+        attempts = q1("SELECT COUNT(*) c FROM videos WHERE user_id=? AND kind='recreate'", (uid,))["c"]
+        best = q1("SELECT MAX(score) s FROM videos WHERE user_id=? AND kind='recreate' AND score IS NOT NULL", (uid,))["s"]
+        if not (records_now or records_past or completed or beatit or created):
+            continue
+        fame = records_now*100 + records_past*40 + completed*12 + beatit*9 + created*18 + (best or 0)*0.25 + attempts*1
+        vids = qa("""SELECT * FROM videos WHERE user_id=? AND status='approved'
+                     AND (kind='beatit' OR (kind='recreate' AND score>=100))
+                     ORDER BY COALESCE(score,0) DESC, id DESC LIMIT 10""", (uid,))
+        out.append({
+            "user": user_pub(uid),
+            "fame": round(fame),
+            "stats": {"records_now": records_now, "records_past": records_past, "completed": completed,
+                      "beatit": beatit, "created": created, "attempts": attempts, "best": best},
+            "videos": videos_pub(vids, me),
+        })
+    out.sort(key=lambda x: -x["fame"])
+    return jsonify(legends=out)
+
 @app.get("/api/records")
 def records_hall():
     me = current_user()
