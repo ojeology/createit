@@ -393,7 +393,7 @@ function videoCard(v, opts = {}) {
   const kindTag = v.kind === "beatit" ? `<span class="pill-mini pm-fire">${ic("zap", 10)} BEAT IT</span>`
     : v.kind === "creation" ? `<span class="pill-mini pm-violet">${ic("globe", 10)} CREATION</span>`
     : `<span class="pill-mini pm-teal">ATTEMPT ${v.attempt_no ? "#" + v.attempt_no : ""}</span>`;
-  return `<div class="v-card" data-act="open-video" data-vid="${v.id}"><div class="card-glare"></div>
+  return `<div class="v-card" data-act="open-video" data-vid="${v.id}" data-longpress="${v.id}"><div class="card-glare"></div>
     <div class="v-thumb">${thumb(v)}<div class="veil"></div>
       <span class="play-tag">${kindTag} ${scoreBadge(v.score)}</span>
       <div class="v-overlay">
@@ -628,7 +628,7 @@ function burst(btn) {
   }
 }
 
-const feedCard = v => `<div class="feed-card" data-act="open-video" data-vid="${v.id}">
+const feedCard = v => `<div class="feed-card" data-act="open-video" data-vid="${v.id}" data-longpress="${v.id}">
   <div class="fc-thumb">${thumb(v)}<div class="veil"></div><div class="fc-score">${scoreBadge(v.score)}</div></div>
   <div class="fc-meta">${avatar(v.owner, "sm")}<span>@${esc(v.owner.username)}</span>${v.attempt_no ? `<em>#${v.attempt_no}</em>` : ""}</div>
 </div>`;
@@ -659,6 +659,73 @@ function beatBoard(c) {
 }
 
 let HOME_DATA = null;
+// ---------------- long-press quick actions ----------------
+let _lpTimer = null, _lpFired = false;
+document.addEventListener("pointerdown", e => {
+  const t = e.target.closest("[data-longpress]");
+  if (!t) return;
+  _lpFired = false;
+  const sx = e.clientX, sy = e.clientY;
+  clearTimeout(_lpTimer);
+  _lpTimer = setTimeout(() => {
+    _lpFired = true;
+    if (typeof haptic === "function") haptic(22);
+    quickActions(t.dataset.longpress);
+  }, 450);
+  const mv = ev => { if (Math.abs(ev.clientX - sx) > 10 || Math.abs(ev.clientY - sy) > 10) clearTimeout(_lpTimer); };
+  const up = () => { clearTimeout(_lpTimer); document.removeEventListener("pointermove", mv); document.removeEventListener("pointerup", up); };
+  document.addEventListener("pointermove", mv, { passive: true });
+  document.addEventListener("pointerup", up);
+}, { passive: true });
+document.addEventListener("click", e => {
+  if (_lpFired) { _lpFired = false; e.stopPropagation(); e.preventDefault(); }
+}, true);
+
+async function quickActions(vid) {
+  let v;
+  try { v = (await api(`/api/video/${vid}`)).video; } catch (e) { return; }
+  if (!v) return;
+  const ch = v.challenge;
+  const root = document.getElementById("modal-root");
+  root.insertAdjacentHTML("beforeend", `<div class="qa-backdrop" id="qa-bd">
+    <div class="qa-sheet">
+      <div class="sheet-grip"></div>
+      <div class="qa-head">${avatar(v.owner, "sm")} <b>@${esc(v.owner.username)}</b><span class="qa-title">${esc(v.title || "")}</span></div>
+      <div class="qa-opts">
+        ${ch ? `<button class="qa-opt" data-qa="ch" data-id="${ch.id}">${ic("flame", 18)}<span>Open challenge · ${esc(ch.code)}</span></button>` : ""}
+        ${ch ? `<button class="qa-opt" data-qa="savech" data-id="${ch.id}">${ic("target", 18)}<span>Save challenge to Attempts</span></button>`
+             : `<button class="qa-opt" data-qa="savevid" data-id="${v.id}">${ic("target", 18)}<span>Save video for later</span></button>`}
+        <button class="qa-opt" data-qa="share" data-id="${v.id}">${ic("share", 18)}<span>Share</span></button>
+        <button class="qa-opt" data-qa="profile" data-id="${esc(v.owner.username)}">${ic("user", 18)}<span>View @${esc(v.owner.username)}</span></button>
+      </div>
+    </div>
+  </div>`);
+  const bd = document.getElementById("qa-bd");
+  const close = () => bd.remove();
+  bd.addEventListener("click", e => { if (e.target.id === "qa-bd") close(); });
+  bd.querySelectorAll(".qa-opt").forEach(b => b.addEventListener("click", async () => {
+    const a = b.dataset.qa;
+    if (a === "ch") { close(); location.hash = "/challenge/" + b.dataset.id; }
+    else if (a === "profile") { close(); location.hash = "/user/" + b.dataset.id; }
+    else if (a === "share") {
+      try { await navigator.clipboard.writeText(location.origin + "/#/video/" + b.dataset.id); } catch (e) {}
+      toast("Link copied — share the ability."); close();
+    }
+    else if (a === "savech") {
+      if (!ME) { toast("Log in to save challenges"); close(); return; }
+      try { const d = await api(`/api/challenge/${b.dataset.id}/attempt-toggle`, { method: "POST" });
+        toast(d.saved ? "Saved to Attempts — go practice." : "Removed from Attempts."); } catch (e) { toast(e.message, true); }
+      close();
+    }
+    else if (a === "savevid") {
+      if (!ME) { toast("Log in to save videos"); close(); return; }
+      try { const d = await api(`/api/video/${b.dataset.id}/save-toggle`, { method: "POST" });
+        toast(d.saved ? "Saved for later." : "Removed from saved."); } catch (e) { toast(e.message, true); }
+      close();
+    }
+  }));
+}
+
 // ---------------- global follow state: one source of truth ----------------
 const FOLLOW_STATE = {};
 function setFollowState(username, following) {
@@ -1293,6 +1360,16 @@ function uploadStatus(v) {
 }
 
 let PROF = null, PROF_TAB = "creations";
+function profTile(v) {
+  const score = v.score != null
+    ? `<span class="pf-tile-score">${v.kind === "beatit" ? ic("crown", 11) : ic("check", 11)} ${v.score}%</span>` : "";
+  return `<div class="pf-tile" data-act="open-video" data-vid="${v.id}" data-longpress="${v.id}">
+    ${v.poster ? `<img src="${v.poster}" alt="" loading="lazy">` : `<div class="pf-tile-noposter">${ic("film", 22)}</div>`}
+    <div class="pf-tile-views">${ic("play", 11)} ${v.views || 0}</div>
+    ${score}
+  </div>`;
+}
+
 function profTabHTML(tab) {
   const d = PROF;
   if (tab === "creations") {
@@ -1300,7 +1377,7 @@ function profTabHTML(tab) {
     ${d.uploads.length ? d.uploads.map(v => {
       const [label, cls] = uploadStatus(v);
       return `<div class="up-row">
-        <div class="up-th" data-act="open-video" data-vid="${v.id}" data-vlist="prof-uploads">${thumb(v)}</div>
+        <div class="up-th" data-act="open-video" data-vid="${v.id}" data-vlist="prof-uploads" data-longpress="${v.id}">${thumb(v)}</div>
         <div class="up-mid"><div class="up-t">${esc(v.title)}</div>
           <div class="up-s"><span>${timeAgo(v.created_at)}</span><span>${ic("eye", 11)} ${v.views || 0}</span><span>${ic("heart", 11)} ${v.likes}</span>
           ${v.challenge ? `<span style="color:var(--ice)">${esc(v.challenge.code)}</span>` : ""}</div></div>
@@ -1310,14 +1387,14 @@ function profTabHTML(tab) {
   }
   if (tab === "recreates") {
     const rec = (d.attempts || []).filter(v => v.score != null && v.score >= 100);
-    return rec.length ? `<div class="grid3" data-vlist="prof-recreates" data-vlabel="RECREATE IT">${rec.map(v => videoCard(v)).join("")}</div>`
+    return rec.length ? `<div class="pf-grid" data-vlist="prof-recreates" data-vlabel="RECREATE IT">${rec.map(v => profTile(v)).join("")}</div>`
       : `<div class="empty">${ic("check", 22)}<br>No successful recreations yet — reach 100% to land here.</div>`;
   }
   if (tab === "beatit") {
     const champ = (d.champion_of || []);
     return (d.beatit_list.length || champ.length) ? `
       ${champ.length ? `<div class="hint" style="margin-bottom:12px">${ic("crown", 13)} CHAMPION OF: ${champ.map(c => `<b data-nav="/challenge/${c.id}" style="cursor:pointer">${esc(c.code)}</b>`).join(" · ")}</div>` : ""}
-      ${d.beatit_list.length ? `<div class="grid3" data-vlist="prof-beatit" data-vlabel="BEAT IT">${d.beatit_list.map(v => videoCard(v)).join("")}</div>` : ""}`
+      ${d.beatit_list.length ? `<div class="pf-grid" data-vlist="prof-beatit" data-vlabel="BEAT IT">${d.beatit_list.map(v => profTile(v)).join("")}</div>` : ""}`
       : `<div class="empty">${ic("zap", 22)}<br>Beat It unlocks after a 100% recreate. One final shot.</div>`;
   }
   if (tab === "saved") {
@@ -1330,7 +1407,7 @@ function profTabHTML(tab) {
         ${stagePill(c.stage)}
       </div>`).join("") : ""}
       ${svv.length ? `<div class="hint" style="margin:16px 0 10px">${ic("target", 13)} SAVED VIDEOS — TRY THEM LATER</div>
-      <div class="grid3" data-vlist="prof-savedvids" data-vlabel="SAVED VIDEOS">${svv.map(v => videoCard(v)).join("")}</div>` : ""}`
+      <div class="pf-grid" data-vlist="prof-savedvids" data-vlabel="SAVED VIDEOS">${svv.map(v => profTile(v)).join("")}</div>` : ""}`
       : `<div class="empty">${ic("target", 22)}<br>Tap ATTEMPT on any video or challenge to save it for later.</div>`;
   }
   if (tab === "journeys") {
