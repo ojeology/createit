@@ -146,7 +146,14 @@ function djArmPager() {
   track.addEventListener("pointercancel", () => { if (DG.down) { DG.down = false; djCenter(); } }, { passive: true });
 }
 
+let _djLastTap = 0;
 function djHandleTap() {
+  const now = Date.now();
+  if (now - _djLastTap < 300) { _djLastTap = 0; djReact(); return; }  // double-tap
+  _djLastTap = now;
+  setTimeout(() => { if (_djLastTap === now) djSoundTap(); }, 270);   // single tap (confirmed)
+}
+function djSoundTap() {
   const vid = djActiveVideo();
   if (!vid) return;
   if (vid.muted) {
@@ -156,6 +163,29 @@ function djHandleTap() {
     vid.play().catch(() => {});
   } else if (!vid.paused) vid.pause();
   else vid.play().catch(() => {});
+}
+async function djReact() {
+  const v = DJ.videos[DJ.idx];
+  if (!v) return;
+  if (typeof haptic === "function") haptic([14, 40, 20]);
+  djShowHeart();
+  if (!ME) { toast("Log in to react to creations"); return; }
+  try {
+    const d = await api(`/api/video/${v.id}/like`, { method: "POST" });
+    v.likes = d.likes; v.liked = d.liked;
+    if (d.liked && typeof burst === "function") { const rail = document.querySelector(".djr-bottom .djr-act"); if (rail) burst(rail); }
+  } catch (e) {}
+}
+function djShowHeart() {
+  const track = document.getElementById("djr-track");
+  const slide = track && track.children[DJ.idx];
+  if (!slide) return;
+  const h = document.createElement("div");
+  h.className = "dj-heart";
+  h.innerHTML = (typeof ic === "function") ? ic("heart", 96) : "❤";
+  slide.appendChild(h);
+  requestAnimationFrame(() => h.classList.add("go"));
+  setTimeout(() => h.remove(), 850);
 }
 
 function djGo(dir) {

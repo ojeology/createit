@@ -3001,3 +3001,91 @@ body::after{background:radial-gradient(circle, rgba(124,92,255,.16), transparent
 .hero-stats .hs-wide span b{font-size:13px;color:var(--text);font-family:var(--body);font-weight:700}
 .hs-line{height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}
 .hs-line>div{height:100%;border-radius:99px;background:var(--grad-fire);box-shadow:0 0 14px rgba(255,110,50,.6);transition:width 1s cubic-bezier(.2,.8,.3,1)}
+
+/* ════════════════════════════════════════════════════════════
+   v34 — ALIVE: motion, momentum, micro-delight
+   ════════════════════════════════════════════════════════════ */
+/* kill web tells: scrollbars + rubber-band */
+*{scrollbar-width:none}
+*::-webkit-scrollbar{width:0;height:0;display:none}
+html{overscroll-behavior-y:none}
+body{-webkit-overflow-scrolling:touch;overscroll-behavior:none}
+
+/* ---- screen transitions: spring, not fade ---- */
+#app.view-in>*{animation:screen-in .5s cubic-bezier(.16,1,.3,1) both}
+#app.view-in>*:nth-child(2){animation-delay:.04s}
+#app.view-in>*:nth-child(3){animation-delay:.08s}
+#app.view-in>*:nth-child(4){animation-delay:.12s}
+#app.view-in>*:nth-child(5){animation-delay:.15s}
+#app.view-in>*:nth-child(6){animation-delay:.18s}
+#app.view-in>*:nth-child(7){animation-delay:.21s}
+@keyframes screen-in{from{opacity:0;transform:translateY(24px) scale(.985)}to{opacity:1;transform:none}}
+
+/* ---- staggered grid entrances ---- */
+.grid3 .v-card,.grid3 .ch-card,.grid3 .arena-card{animation:card-in .55s cubic-bezier(.16,1,.3,1) both}
+.grid3>*:nth-child(1){animation-delay:.02s}.grid3>*:nth-child(2){animation-delay:.06s}
+.grid3>*:nth-child(3){animation-delay:.10s}.grid3>*:nth-child(4){animation-delay:.14s}
+.grid3>*:nth-child(5){animation-delay:.18s}.grid3>*:nth-child(6){animation-delay:.22s}
+.grid3>*:nth-child(n+7){animation-delay:.26s}
+@keyframes card-in{from{opacity:0;transform:translateY(22px) scale(.96)}to{opacity:1;transform:none}}
+
+/* ---- rails slide in ---- */
+.cirail{animation:rail-in .6s cubic-bezier(.16,1,.3,1) both}
+@keyframes rail-in{from{opacity:0;transform:translateY(30px) scale(.98)}to{opacity:1;transform:none}}
+
+/* ---- hero cinematic entrance ---- */
+.hero .hero-media{animation:hero-in .8s cubic-bezier(.16,1,.3,1) both}
+@keyframes hero-in{from{opacity:0;transform:translateY(30px) scale(1.02)}to{opacity:1;transform:none}}
+.hero-info{animation:hero-info-in .7s cubic-bezier(.16,1,.3,1) .25s both}
+@keyframes hero-info-in{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+.hero-flag{animation:flag-in .6s cubic-bezier(.34,1.56,.64,1) .35s both}
+@keyframes flag-in{from{opacity:0;transform:translateY(-14px) scale(.8)}to{opacity:1;transform:none}}
+.hero-stats{animation:stats-in .6s cubic-bezier(.16,1,.3,1) .3s both}
+@keyframes stats-in{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+
+/* ---- arena panels breathe in ---- */
+.stage-panel{animation:panel-in .6s cubic-bezier(.16,1,.3,1) both}
+.stage-panel:nth-child(2){animation-delay:.08s}
+.stage-panel:nth-child(3){animation-delay:.16s}
+@keyframes panel-in{from{opacity:0;transform:translateY(28px) scale(.97)}to{opacity:1;transform:none}}
+
+/* ---- button spring ---- */
+.btn{transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s ease,background .2s ease,border-color .2s ease}
+.btn:active{transform:scale(.94)}
+.chip:active,.cat-chip:active,.pf-tab:active{transform:scale(.95)}
+
+/* ---- avatar pulse ring on profile ---- */
+.prof-head .avatar.lg{animation:avatar-in .7s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes avatar-in{from{opacity:0;transform:scale(.5) rotate(-8deg)}to{opacity:1;transform:none}}
+
+/* ---- stat count-up glow ---- */
+.stat-box .v{transition:transform .2s ease}
+.stat-box:hover .v{transform:scale(1.08)}
+
+/* ---- follow burst ---- */
+.follow-burst{position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center}
+.follow-burst span{position:absolute;width:8px;height:8px;border-radius:50%;background:var(--grad-fire);
+  animation:burst .7s cubic-bezier(.16,1,.3,1) forwards}
+
+/* ---- double-tap heart on discovery ---- */
+.dj-heart{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.3);z-index:20;
+  pointer-events:none;opacity:0;color:#ff4d2e;filter:drop-shadow(0 6px 24px rgba(255,77,46,.7))}
+.dj-heart.go{animation:dj-heart-pop .8s cubic-bezier(.16,1,.3,1) forwards}
+@keyframes dj-heart-pop{0%{opacity:0;transform:translate(-50%,-50%) scale(.3)}
+  25%{opacity:1;transform:translate(-50%,-50%) scale(1.25)}
+  55%{transform:translate(-50%,-50%) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(1.1) translateY(-30px)}}
+
+/* ---- smooth anchor + momentum on rails ---- */
+.cirail-track,.hscroll,.feed-strip,.prof-tabs{-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+
+/* ---- subtle floating on create button ---- */
+.bn-create{animation:create-breathe 3s ease-in-out infinite}
+@keyframes create-breathe{0%,100%{box-shadow:var(--glow-fire),var(--shadow-1)}50%{box-shadow:0 12px 40px rgba(255,90,40,.6),var(--shadow-1)}}
+
+/* ---- record gold shimmer ---- */
+.champ-plate{position:relative;overflow:hidden}
+.champ-plate::after{content:"";position:absolute;top:0;left:-80%;width:50%;height:100%;
+  background:linear-gradient(100deg,transparent,rgba(245,197,24,.14),transparent);
+  animation:gold-sheen 3.5s ease-in-out infinite}
+@keyframes gold-sheen{0%,60%{left:-80%}100%{left:140%}}

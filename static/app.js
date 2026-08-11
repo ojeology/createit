@@ -537,7 +537,7 @@ document.addEventListener("click", async e => {
       const wasLiked = el.classList.contains("btn-fire") || el.classList.contains("on");
       el.classList.toggle("btn-fire", !wasLiked); el.classList.toggle("on", !wasLiked);
       if (span) span.textContent = Math.max(0, (parseInt(span.textContent) || 0) + (wasLiked ? -1 : 1));
-      if (!wasLiked) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); burst(el); }
+      if (!wasLiked) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); burst(el); haptic(16); }
       try { const d = await api(`/api/video/${vid}/like`, { method: "POST" }); if (span) span.textContent = d.likes; }
       catch (err) { toast(err.message, true); }
     }
@@ -680,6 +680,7 @@ async function toggleFollow(username) {
   if (!ME) { toast("Log in to follow creators"); setTimeout(() => location.hash = "/login", 400); return; }
   if (username === ME.username) return;
   const next = !(FOLLOW_STATE[username] || false);
+  haptic(next ? 18 : 10);
   setFollowState(username, next);                       // optimistic — every instance updates instantly
   try {
     const d = await api(`/api/user/${username}/follow`, { method: "POST" });
@@ -1217,6 +1218,7 @@ async function viewCreate(query) {
       xhr.onload = () => {
         let d = {}; try { d = JSON.parse(xhr.responseText); } catch (e) {}
         if (xhr.status >= 200 && xhr.status < 300) {
+          haptic([20, 60, 30]);
           momentFlash(kind === "creation" ? "YOUR CREATION IS LIVE" : kind === "beatit" ? "FINAL SUBMISSION LOCKED" : "YOUR ATTEMPT IS IN",
                       kind === "creation" ? "CreateIt and the Arena are watching." : "CreateIt evaluators are on it. Your journey grows.");
           setTimeout(() => { location.hash = kind === "creation" ? "/" : `/video/${d.video_id}`; }, 1250);
@@ -2343,6 +2345,11 @@ function statusBanner(c) {
 
 // ---------------- signature moments ----------------
 const MOMENTS = new Set();
+function haptic(pattern) {
+  try { if (navigator.vibrate) navigator.vibrate(pattern || 12); } catch (e) {}
+}
+window.haptic = haptic;
+
 function momentFlash(title, sub) {
   const root = document.getElementById("modal-root");
   if (!root) return;
