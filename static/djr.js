@@ -40,7 +40,7 @@ function djShell() {
         <button class="djr-act" data-act="dj-rate">${ic("zap", 20)}<span>RATE</span><em id="djr-rate-avg"></em></button>
         <button class="djr-act" data-act="dj-comment">${ic("chat", 20)}<span>COMMENT</span><em id="djr-c-n"></em></button>
         <button class="djr-act" data-act="dj-share">${ic("share", 19)}<span>SHARE</span></button>
-        <button class="djr-act djr-go" data-act="dj-attempt" id="djr-attempt">${ic("target", 20)}<span id="djr-attempt-lbl">ATTEMPT</span></button>
+        <button class="djr-act djr-go" data-act="dj-attempt" id="djr-attempt"><span class="act-ic">${ic("target", 20)}</span><span id="djr-attempt-lbl">ATTEMPT</span></button>
       </div>
     </div>
     <div class="djr-progress"><div id="djr-pbar"></div></div>
@@ -397,7 +397,10 @@ function djUpdateOverlay() {
   if (!v) return;
   let kicker, sub;
   if (v.djChapter) { kicker = v.djChapter; sub = v.challenge ? `${v.challenge.code} · ${v.challenge.title}` : ""; }
-  else if (v.kind === "creation") { kicker = "ORIGINAL CREATION"; sub = v.challenge ? `${v.challenge.code} · ${v.challenge.title}` : "POTENTIAL CREATEIT CHALLENGE"; }
+  else if (v.kind === "creation") {
+    if (v.challenge) { kicker = `OFFICIAL CREATEIT CHALLENGE · ${v.challenge.code}`; sub = v.challenge.title; }
+    else { kicker = "ORIGINAL CREATION"; sub = "POTENTIAL CREATEIT CHALLENGE"; }
+  }
   else if (v.kind === "beatit") { kicker = `BEAT IT · FINAL${v.score != null ? ` · ${v.score}%` : ""}`; sub = v.challenge ? `${v.challenge.code} · ${v.challenge.title}` : ""; }
   else { kicker = `ATTEMPT #${v.attempt_no || "?"}${v.score != null ? ` · ${v.score}% MATCH` : ""}`; sub = v.challenge ? `${v.challenge.code} · ${v.challenge.title}` : ""; }
   const info = document.getElementById("djr-info");
@@ -417,12 +420,34 @@ function djUpdateOverlay() {
   const ra = document.getElementById("djr-rate-avg");
   if (ra) ra.textContent = v.rating && v.rating.count ? v.rating.avg : "";
   const att = document.getElementById("djr-attempt");
+  const lbl = document.getElementById("djr-attempt-lbl");
+  const ico = att && att.querySelector(".act-ic");
   if (att) {
-    if (v.challenge) {
-      att.style.display = "";
-      att.dataset.cid = v.challenge.id;
-      document.getElementById("djr-attempt-lbl").textContent = (v.challenge.mine && v.challenge.mine.saved) ? "SAVED ✓" : "ATTEMPT";
-    } else att.style.display = "none";
+    att.style.display = "";
+    att.classList.remove("djr-view");
+    if (v.kind === "creation" && v.challenge) {
+      // official CreateIt challenge → challenge flow, not attempts
+      att.dataset.mode = "challenge"; att.dataset.cid = v.challenge.id; delete att.dataset.vid2;
+      if (ico) ico.innerHTML = ic("refresh", 20);
+      lbl.textContent = "RECREATE IT";
+      att.dataset.nav = "/challenge/" + v.challenge.id;
+    } else if (v.kind === "recreate" && v.challenge) {
+      att.dataset.mode = "challenge"; att.dataset.cid = v.challenge.id;
+      if (ico) ico.innerHTML = ic("eye", 20);
+      lbl.textContent = "VIEW CHALLENGE";
+      att.dataset.nav = "/challenge/" + v.challenge.id;
+    } else if (v.kind === "beatit" && v.challenge) {
+      att.dataset.mode = "challenge"; att.dataset.cid = v.challenge.id;
+      if (ico) ico.innerHTML = ic("disc", 20);
+      lbl.textContent = "VIEW RECORD";
+      att.dataset.nav = "/challenge/" + v.challenge.id;
+    } else {
+      // normal video → ATTEMPT = save it for later
+      att.dataset.mode = "save"; att.dataset.vid2 = v.id; delete att.dataset.nav;
+      if (ico) ico.innerHTML = ic("target", 20);
+      lbl.textContent = v.saved ? "SAVED ✓" : "ATTEMPT";
+      att.classList.toggle("saved", !!v.saved);
+    }
   }
   const pb = document.getElementById("djr-pbar");
   if (pb) pb.style.width = "0%";
@@ -581,6 +606,20 @@ async function djSendComment() {
 }
 
 // ---------------- attempt / share ----------------
+async function djSaveVideo(btn) {
+  if (!ME) { toast("Log in to save videos to your Attempts"); setTimeout(() => location.hash = "/login", 400); return; }
+  const v = DJ.videos[DJ.idx];
+  if (!v) return;
+  try {
+    const d = await api(`/api/video/${v.id}/save-toggle`, { method: "POST" });
+    v.saved = d.saved;
+    const lbl = document.getElementById("djr-attempt-lbl");
+    if (lbl) lbl.textContent = d.saved ? "SAVED ✓" : "ATTEMPT";
+    btn.classList.toggle("saved", d.saved);
+    toast(d.saved ? "Saved to Attempts — go practice." : "Removed from Attempts");
+  } catch (err) { toast(err.message, true); }
+}
+
 async function djAttempt(btn) {
   if (!ME) { toast("Log in to save challenges to your Attempts"); setTimeout(() => location.hash = "/login", 400); return; }
   const cid = btn.dataset.cid;
@@ -780,7 +819,11 @@ document.addEventListener("click", async e => {
     case "dj-close-sheet": djCloseSheet(); break;
     case "dj-send-comment": djSendComment(); break;
     case "dj-share": djShare(); break;
-    case "dj-attempt": djAttempt(el); break;
+    case "dj-attempt": {
+      if (el.dataset.mode === "challenge" && el.dataset.nav) { location.hash = el.dataset.nav; break; }
+      if (el.dataset.mode === "save") { djSaveVideo(el); break; }
+      djAttempt(el); break;
+    }
     case "dj-retry": djRetry(+el.dataset.i); break;
     case "dj-enter-cat": djEnterCat(el.dataset.slug, el.dataset.label || el.dataset.slug); break;
     case "dj-enter-story": djEnterStory(el.dataset.id, el.dataset.label); break;

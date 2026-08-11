@@ -124,6 +124,7 @@ CREATE INDEX IF NOT EXISTS idx_vc_cat ON video_categories(category_id);
 CREATE TABLE IF NOT EXISTS blocks(id INTEGER PRIMARY KEY, blocker_id INTEGER, blocked_id INTEGER, created_at TEXT, UNIQUE(blocker_id, blocked_id));
 CREATE TABLE IF NOT EXISTS password_resets(id INTEGER PRIMARY KEY, user_id INTEGER, code TEXT, expires_at TEXT, used INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS comment_likes(id INTEGER PRIMARY KEY, comment_id INTEGER, user_id INTEGER, UNIQUE(comment_id, user_id));
+CREATE TABLE IF NOT EXISTS saved_videos(id INTEGER PRIMARY KEY, user_id INTEGER, video_id INTEGER, created_at TEXT, UNIQUE(user_id, video_id));
 CREATE INDEX IF NOT EXISTS idx_cc_cat ON challenge_categories(category_id);
 """
 
@@ -360,6 +361,9 @@ def videos_pub(rows, me=None):
     liked = set()
     if me_id:
         liked = {x[0] for x in qa(f"SELECT video_id FROM likes WHERE user_id=? AND video_id IN ({ph})", (me_id, *vids))}
+    vsaved = set()
+    if me_id:
+        vsaved = {x[0] for x in qa(f"SELECT video_id FROM saved_videos WHERE user_id=? AND video_id IN ({ph})", (me_id, *vids))}
     owners = users_pub_map([r["user_id"] for r in rows])
     ch_ids = list({r["challenge_id"] for r in rows if r["challenge_id"]})
     chs = {}
@@ -383,6 +387,7 @@ def videos_pub(rows, me=None):
             "owner": owners.get(r["user_id"]),
             "challenge": chs.get(r["challenge_id"]),
             "likes": like_c.get(r["id"], 0), "liked": r["id"] in liked, "comments": com_c.get(r["id"], 0),
+            "saved": r["id"] in vsaved,
             "rating": {"avg": rate_c.get(r["id"], (0, 0))[0], "count": rate_c.get(r["id"], (0, 0))[1],
                        "mine": mine_rate.get(r["id"], 0)},
         })
@@ -647,6 +652,18 @@ def like(u, vid):
     commit()
     return jsonify(liked=liked, likes=q1("SELECT COUNT(*) c FROM likes WHERE video_id=?", (vid,))["c"])
 
+@app.post("/api/video/<int:vid>/save-toggle")
+@require_user
+def video_save_toggle(u, vid):
+    r = get_video(vid)
+    if not r: return jsonify(error="Not found"), 404
+    if q1("SELECT 1 FROM saved_videos WHERE user_id=? AND video_id=?", (u["id"], vid)):
+        q("DELETE FROM saved_videos WHERE user_id=? AND video_id=?", (u["id"], vid)); saved = False
+    else:
+        q("INSERT INTO saved_videos (user_id, video_id, created_at) VALUES (?,?,?)", (u["id"], vid, now_iso())); saved = True
+    commit()
+    return jsonify(saved=saved)
+
 @app.post("/api/comment/<int:cid>/like")
 @require_user
 def comment_like(u, cid):
@@ -724,6 +741,8 @@ def profile(username):
     created = challenges_pub(qa("SELECT * FROM challenges WHERE creator_id=? ORDER BY id DESC", (u["id"],)), me)
     saved = challenges_pub(qa("""SELECT c.* FROM attempt_saves s JOIN challenges c ON c.id=s.challenge_id
                                  WHERE s.user_id=? ORDER BY s.id DESC""", (u["id"],)), me)
+    saved_vids = videos_pub(qa("""SELECT v.* FROM saved_videos sv JOIN videos v ON v.id=sv.video_id
+                                  WHERE sv.user_id=? ORDER BY sv.id DESC LIMIT 60""", (u["id"],)), me)
     best_row = q1("SELECT MAX(score) s FROM videos WHERE user_id=? AND kind='recreate' AND score IS NOT NULL", (u["id"],))
     beatit_list = videos_pub(qa(f"SELECT * FROM videos WHERE user_id=? AND kind='beatit'{vis} ORDER BY id DESC", (u["id"],)), me)
     return jsonify(user=pub, stats={"champion": len(champs), "completed": completed, "attempts": attempts,
@@ -731,7 +750,7 @@ def profile(username):
                                      "created": len(created), "best_score": best_row["s"]},
                    champion_of=[{"id": c["id"], "code": c["code"], "title": c["title"], "score": c["champion_score"]} for c in champs],
                    journeys=journeys, creations=creation_list, uploads=uploads, attempts=attempts, records=records,
-                   created_challenges=created, beatit_list=beatit_list, saved=saved)
+                   created_challenges=created, beatit_list=beatit_list, saved=saved, saved_videos=saved_vids)
 
 @app.post("/api/user/socials")
 @require_user

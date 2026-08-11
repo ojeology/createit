@@ -342,9 +342,10 @@ function renderChrome() {
 document.addEventListener("click", e => {
   if (!e.target.closest(".rate")) $$(".rate.open").forEach(r => r.classList.remove("open"));
   if (e.target.closest("[data-act='create-sheet']")) { openCreateSheet(); return; }
-  // data-act (play video, like…) always wins over an ancestor data-nav
-  if (e.target.closest("[data-act]")) return;
+  // precedence: whichever is closer to the tap wins
   const navEl = e.target.closest("[data-nav]");
+  const actEl = e.target.closest("[data-act]");
+  if (actEl && (actEl === navEl || !actEl.contains(navEl))) return;
   if (navEl) {
     e.preventDefault();
     const path = navEl.dataset.nav;
@@ -801,13 +802,13 @@ async function viewHome() {
   <div style="height:10px"></div>` : `<div class="empty">${ic("film", 22)}<br>The Arena is waiting for its first challenge.</div>`}
 
   ${d.hero_success.length ? `
-  ${secHead("", "refresh", "RECREATE IT", "approved recreations of this week's challenge — they play themselves")}
+  ${secHead("", "refresh", "RECREATE IT", "approved recreations of this week's challenge — they play themselves", ["Enter the challenge", "#/challenge/" + h.id])}
   <div class="cirail" id="rail-rec">
     <div class="cirail-track">${d.hero_success.map((v, i) => railSlide(v, i, "rec")).join("")}</div>
   </div>` : ""}
 
   ${d.beat_feed.length ? `
-  ${secHead("", "zap", "BEAT IT", "the record attack — the best current performance is on top")}
+  ${secHead("", "zap", "BEAT IT", "the record attack — the best current performance is on top", ["View the record", "#/challenge/" + h.id])}
   <div class="record-now">${ic("disc", 14)} CURRENT RECORD <b>${d.beat_feed[0].score}%</b> · @${esc(d.beat_feed[0].owner.username)}</div>
   <div class="cirail" id="rail-beat">
     <div class="cirail-track">${d.beat_feed.map((v, i) => railSlide(v, i, "beat")).join("")}</div>
@@ -1274,12 +1275,16 @@ function profTabHTML(tab) {
   }
   if (tab === "saved") {
     const sv = d.saved || [];
-    return sv.length ? sv.map(c => `
+    const svv = d.saved_videos || [];
+    return (sv.length || svv.length) ? `
+      ${sv.length ? `<div class="hint" style="margin-bottom:10px">${ic("flame", 13)} SAVED CHALLENGES</div>` + sv.map(c => `
       <div class="srch-ch-row" data-nav="/challenge/${c.id}" style="margin-bottom:8px">
         <div style="flex:1;min-width:0"><div class="sc-code">${esc(c.code)}</div><div class="sc-title">${esc(c.title)}</div></div>
         ${stagePill(c.stage)}
-      </div>`).join("")
-      : `<div class="empty">${ic("target", 22)}<br>Tap ATTEMPT on any challenge to save it for later.</div>`;
+      </div>`).join("") : ""}
+      ${svv.length ? `<div class="hint" style="margin:16px 0 10px">${ic("target", 13)} SAVED VIDEOS — TRY THEM LATER</div>
+      <div class="grid3" data-vlist="prof-savedvids" data-vlabel="SAVED VIDEOS">${svv.map(v => videoCard(v)).join("")}</div>` : ""}`
+      : `<div class="empty">${ic("target", 22)}<br>Tap ATTEMPT on any video or challenge to save it for later.</div>`;
   }
   if (tab === "journeys") {
     return d.journeys.length ? d.journeys.map(j => `
@@ -1329,6 +1334,7 @@ async function viewProfile(username) {
     regList("prof-uploads", d.uploads || []);
     regList("prof-recreates", (d.attempts || []).filter(v => v.score != null && v.score >= 100));
     regList("prof-beatit", d.beatit_list || []);
+    regList("prof-savedvids", d.saved_videos || []);
     regList("prof-creations", d.creations || []);
   }
   const u = d.user, st = d.stats;
