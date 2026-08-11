@@ -530,7 +530,7 @@ document.addEventListener("click", async e => {
     }
     else if (act === "hero-sound") {
       const v = $("#hero-video");
-      if (v) { v.muted = !v.muted; el.innerHTML = ic(v.muted ? "volumeX" : "volume2", 16); el.classList.toggle("on", !v.muted); }
+      if (v) { v.muted = !v.muted; if (!v.muted) { soloAudio(v); v.play().catch(() => {}); } el.innerHTML = ic(v.muted ? "volumeX" : "volume2", 16); el.classList.toggle("on", !v.muted); }
     }
     else if (act === "close-player") closePlayer();
     else if (act === "share") { try { await navigator.clipboard.writeText(location.origin + "/#/video/" + (el.dataset.vid || PLAYER_VID)); } catch (err) {} toast("Link copied — share the journey."); }
@@ -836,7 +836,7 @@ function ciRailInit(id, vids) {
     const slide = e.target.closest(".cirail-slide");
     if (!slide || e.target.closest("[data-nav]")) return;
     const vel = slide.querySelector("video");
-    if (vel) { vel.muted = !vel.muted; if (!vel.muted) vel.play().catch(() => {}); }
+    if (vel) { vel.muted = !vel.muted; if (!vel.muted) { if (typeof soloAudio === "function") soloAudio(vel); vel.play().catch(() => {}); } }
   });
   let raf = 0;
   track.addEventListener("scroll", () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; activate(); }); }, { passive: true });
@@ -1332,56 +1332,68 @@ async function viewCreate(query) {
   return `${back}<div class="page-head"><h1 class="big-title" style="font-size:30px">${heads[kind][0]}</h1><div class="meta-row">${heads[kind][1]}</div></div>${form(extra)}`;
 }
 
-async function viewRecords() {
-  const d = await api("/api/records");
-  const L = d.longest;
+function hrCard(r, isLongest) {
   return `
-  <div class="page-head"><span class="crumb">CREATEIT</span><h1 class="big-title">HALL OF RECORDS</h1>
-  <div class="meta-row">Every record is permanent. Every reign is history. Come break one.</div></div>
-  ${!d.records.length ? `<div class="empty">${ic("disc", 26)}<br>No records set yet. The first champion makes history.</div>` : `
-    ${L ? `
-    <div class="hr-spot">
-      <div class="hr-spot-k">${ic("crown", 15)} LONGEST-HELD RECORD</div>
-      <div class="hr-spot-top">
-        ${L.video ? `<div class="hr-spot-vid" data-act="watch" data-vid="${L.video.id}" style="cursor:pointer">
-          <img src="${L.video.poster || ""}" alt="">${ic("play", 30)}</div>` : ""}
-        <div class="hr-spot-info">
-          <div class="hr-spot-code">${esc(L.challenge.code)} · ${esc(L.challenge.title)}</div>
-          <div class="hr-spot-champ">${avatar(L.champion, "md")} <b>@${esc(L.champion.username)}</b>
-            <span class="hr-spot-score">${L.champion.score}%</span></div>
-          <div class="hr-spot-days">${ic("clock", 13)} unbeaten for <b>${L.champion.unbeaten_days}</b> day${L.champion.unbeaten_days === 1 ? "" : "s"}</div>
+  <div class="hr2-card${isLongest ? " hr2-longest" : ""}">
+    ${isLongest ? `<div class="hr2-ribbon">${ic("crown", 12)} LONGEST REIGN</div>` : ""}
+    <div class="hr2-media" data-nav="/challenge/${r.challenge.id}">
+      ${r.video ? `<img src="${r.video.poster || ""}" alt=""><span class="hr2-play">${ic("play", 24)}</span>` : `<div class="hr2-novid">${ic("disc", 26)}</div>`}
+      <div class="hr2-score">${r.champion.score}<em>%</em></div>
+    </div>
+    <div class="hr2-body">
+      <div class="hr2-code">${esc(r.challenge.code)}</div>
+      <div class="hr2-title" data-nav="/challenge/${r.challenge.id}">${esc(r.challenge.title)}</div>
+      <div class="hr2-champ">
+        ${avatar(r.champion, "sm")}
+        <div class="hr2-champ-mid">
+          <b data-nav="/user/${r.champion.username}">@${esc(r.champion.username)}</b>
+          <span>${ic("clock", 11)} ${r.champion.unbeaten_days}d unbeaten${r.challengers ? ` · ${r.challengers} can break it` : ""}</span>
         </div>
       </div>
-    </div>` : ""}
-    <div class="hr-grid">
-      ${d.records.map(r => `
-      <div class="hr-card">
-        <div class="hr-card-top" data-nav="/challenge/${r.challenge.id}">
-          <div class="hr-code">${esc(r.challenge.code)}</div>
-          <div class="hr-title">${esc(r.challenge.title)}</div>
-        </div>
-        <div class="hr-champ">
-          ${avatar(r.champion, "md")}
-          <div class="hr-champ-mid">
-            <b data-nav="/user/${r.champion.username}">@${esc(r.champion.username)}</b>
-            <span>${ic("clock", 11)} ${r.champion.unbeaten_days}d unbeaten${r.challengers ? ` · ${r.challengers} qualified to break it` : ""}</span>
-          </div>
-          <div class="hr-score">${r.champion.score}<em>%</em></div>
-        </div>
-        ${r.history.length ? `
-          <div class="hr-hist-h">RECORD HISTORY</div>
-          <div class="hr-hist">
-            ${r.history.slice(0, 4).map((h, i) => `
-              <div class="hr-hist-row">
-                <span class="hr-hist-rank">#${i + 2}</span>${avatar(h.user, "sm")}
-                <span class="hr-hist-u">@${esc(h.user.username)}</span>
-                <span class="hr-hist-s">${h.score}%</span>
-                ${h.held_days != null ? `<span class="hr-hist-d">held ${h.held_days}d</span>` : ""}
-              </div>`).join("")}
-          </div>` : `<div class="hr-hist-none">First reign — no one has broken it yet.</div>`}
-        <button class="btn btn-fire btn-block hr-break" data-nav="/challenge/${r.challenge.id}">${ic("zap", 14)} TRY TO BREAK IT</button>
-      </div>`).join("")}
-    </div>`}
+      ${r.history.length ? `
+        <div class="hr2-hist">
+          <div class="hr2-hist-h">PREVIOUS CHAMPIONS</div>
+          ${r.history.slice(0, 3).map((h, i) => `
+            <div class="hr2-hist-row">${avatar(h.user, "sm")}<span>@${esc(h.user.username)}</span><b>${h.score}%</b>${h.held_days != null ? `<em>${h.held_days}d</em>` : ""}</div>`).join("")}
+        </div>` : `<div class="hr2-first">${ic("spark", 12)} First reign — unbroken.</div>`}
+      <button class="btn btn-fire btn-block hr2-break" data-nav="/challenge/${r.challenge.id}">${ic("zap", 14)} TRY TO BREAK IT</button>
+    </div>
+  </div>`;
+}
+function renderRecordsList(records, longestId) {
+  if (!records.length) return `<div class="empty">${ic("disc", 24)}<br>No records match. The arena is waiting.</div>`;
+  return `<div class="hr2-grid">${records.map(r => hrCard(r, r.challenge.id === longestId)).join("")}</div>`;
+}
+function hallFilter(q) {
+  const all = window.__RECORDS || [];
+  const f = q ? all.filter(r => (r.challenge.code + " " + r.challenge.title + " " + (r.champion.username || "")).toLowerCase().includes(q)) : all;
+  const box = document.getElementById("hall-list");
+  if (box) box.innerHTML = renderRecordsList(f, window.__LONGEST_ID);
+}
+
+async function viewRecords() {
+  const d = await api("/api/records");
+  window.__RECORDS = d.records;
+  window.__LONGEST_ID = d.longest ? d.longest.challenge.id : null;
+  const totalChallengers = d.records.reduce((a, r) => a + (r.challengers || 0), 0);
+  setTimeout(() => {
+    const inp = document.getElementById("hall-search");
+    if (inp) inp.addEventListener("input", () => hallFilter(inp.value.trim().toLowerCase()));
+  }, 0);
+  return `
+  <div class="hall-hero">
+    <div class="hall-hero-glow"></div>
+    <div class="hall-hero-crown">${ic("crown", 38)}</div>
+    <h1 class="hall-hero-t">HALL OF RECORDS</h1>
+    <div class="hall-hero-s">Permanent. Breakable. Historic.</div>
+    <div class="hall-stats">
+      <div class="hall-stat"><b>${d.records.length}</b><span>Records</span></div>
+      <div class="hall-stat"><b>${d.longest ? d.longest.champion.unbeaten_days + "d" : "—"}</b><span>Longest reign</span></div>
+      <div class="hall-stat"><b>${totalChallengers}</b><span>Challengers</span></div>
+    </div>
+    <div class="hall-search">${ic("target", 18)}<input id="hall-search" placeholder="Search records, champions, challenges…" autocomplete="off"></div>
+  </div>
+  <div id="hall-list">${renderRecordsList(d.records, window.__LONGEST_ID)}</div>
   `;
 }
 
@@ -2570,38 +2582,29 @@ function updateBackBtn(path) {
   bb.style.display = show ? "inline-flex" : "none";
   bb.classList.toggle("show", show);
 }
+// GLOBAL AUDIO DIRECTOR: only one unmuted video at a time, ever
+function soloAudio(video) {
+  document.querySelectorAll("video").forEach(v => { if (v !== video && !v.muted) v.muted = true; });
+}
+window.soloAudio = soloAudio;
+
 function heroViewGate() {
   const hv = $("#hero-video");
   if (!hv || hv.dataset.gated) return;
   hv.dataset.gated = "1";
   new IntersectionObserver(es => es.forEach(en => {
-    if (en.isIntersecting) { if (hv.__shouldPlay !== false) hv.play().catch(() => {}); }
-    else { hv.__shouldPlay = false; hv.pause(); }
-  }), { threshold: 0.25 }).observe(hv);
+    if (en.isIntersecting) { if (!hv.__userPaused) hv.play().catch(() => {}); }
+    else { hv.pause(); }
+  }), { threshold: 0.2 }).observe(hv);
 }
 
 function heroSoundArm() {
   const hv = $("#hero-video");
   if (!hv) return;
-  hv.muted = false;
-  const btnIcon = on => { const b = document.querySelector(".p-sound"); if (b) { b.innerHTML = ic(on ? "volume2" : "volumeX", 16); b.classList.toggle("on", on); } };
-  let armed = false;
-  const armUnmute = () => {
-    if (armed) return; armed = true;
-    const onFirst = () => {
-      document.removeEventListener("pointerdown", onFirst);
-      hv.muted = false;
-      hv.play().catch(() => {});
-      btnIcon(true);
-    };
-    document.addEventListener("pointerdown", onFirst);
-  };
-  const p = hv.play();
-  if (p) p.then(() => btnIcon(true)).catch(() => {
-    hv.muted = true;                     // OS blocked audible autoplay — keep the video moving
-    hv.play().catch(() => {});
-    armUnmute();                         // sound switches on at the first touch, automatically
-  });
+  // Muted-first cinematic autoplay — sound only when the user taps the sound button.
+  // This kills the "sound playing everywhere" bug.
+  hv.muted = true;
+  hv.play().catch(() => {});
 }
 
 function routeLine() {

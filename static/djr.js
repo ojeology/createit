@@ -159,6 +159,7 @@ function djSoundTap() {
   if (vid.muted) {
     vid.muted = false; DJ.muted = false;
     try { sessionStorage.setItem("dj-muted", "0"); } catch (e) {}
+    if (typeof soloAudio === "function") soloAudio(vid);
     djApplySoundBtn();
     vid.play().catch(() => {});
   } else if (!vid.paused) vid.pause();
@@ -524,6 +525,7 @@ function djApplySoundBtn() {
 function djToggleSound() {
   DJ.muted = !DJ.muted;
   try { sessionStorage.setItem("dj-muted", DJ.muted ? "1" : "0"); } catch (e) {}
+  if (!DJ.muted) { const c = djActiveVideo(); if (c && typeof soloAudio === "function") soloAudio(c); }
   const track = document.getElementById("djr-track");
   if (track) {
     const cur = track.children[DJ.idx] && track.children[DJ.idx].querySelector("video");
