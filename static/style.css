@@ -3679,3 +3679,109 @@ body{-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 .lb-rec-holder b{margin-left:auto;font-family:var(--display);font-size:20px;color:#f5c518}
 .lb-rec-cta{align-self:flex-start;margin-top:4px}
 @media (max-width:520px){.lb-podium{gap:8px}.lb-pod-best{font-size:20px}.lb-pod-name{font-size:11px}}
+
+/* ════════════════════════════════════════════════════════════
+   v47 — BOLD & COLORFUL & ENERGETIC (premium, not childish)
+   ════════════════════════════════════════════════════════════ */
+:root{
+  --c-fire:#ff5a2e; --c-fire2:#ffb020;
+  --c-teal:#14e0b0; --c-violet:#8b5cff; --c-gold:#ffc21a;
+  --c-blue:#3d8bff; --c-pink:#ff4d9d; --c-lime:#9dff3d;
+  --grad-fire:linear-gradient(120deg,#ff5a2e,#ffb020);
+  --grad-teal:linear-gradient(120deg,#0fcf9e,#3dffd0);
+  --grad-violet:linear-gradient(120deg,#8b5cff,#c084ff);
+  --grad-gold:linear-gradient(120deg,#ffb020,#ffd84d);
+  --grad-blue:linear-gradient(120deg,#3d8bff,#7fd4ff);
+  --glow-fire:0 10px 34px rgba(255,90,40,.5);
+  --glow-teal:0 10px 30px rgba(20,224,176,.4);
+  --glow-violet:0 10px 30px rgba(139,92,255,.4);
+  --glow-gold:0 10px 30px rgba(255,194,26,.42);
+}
+
+/* ---- multi-color ambient energy ---- */
+body::before{background:radial-gradient(circle, rgba(255,90,46,.22), transparent 60%)}
+body::after{background:radial-gradient(circle, rgba(139,92,255,.2), transparent 60%)}
+body{background:linear-gradient(180deg,#0a0714 0%,#070810 40%,#06080e 100%) fixed}
+
+/* ---- bolder display type ---- */
+.big-title{font-size:clamp(40px,8vw,64px);letter-spacing:.5px}
+.arena-q{font-size:clamp(30px,6vw,48px)}
+.sec h2{font-size:clamp(22px,4vw,28px)}
+
+/* ---- section headers: vivid color slash ---- */
+.sec h2::before{background:var(--grad-fire);box-shadow:var(--glow-fire);width:6px}
+.hof2-sec span,.lb-sec,.chase-sec,.hall-b-t{color:#ffd24d}
+.hof2-sec{border-bottom-color:rgba(255,194,26,.25)}
+
+/* ---- vivid stage pills / chips ---- */
+.pill{border-radius:999px;font-weight:800}
+.st-create_it{background:var(--grad-violet);color:#fff;border-color:transparent;box-shadow:var(--glow-violet)}
+.st-recreate_it{background:var(--grad-teal);color:#03231b;border-color:transparent;box-shadow:var(--glow-teal)}
+.st-recreate_closed{background:linear-gradient(120deg,#ff4d9d,#ff8ac2);color:#fff;border-color:transparent;box-shadow:0 10px 26px rgba(255,77,157,.4)}
+.st-beat_it{background:var(--grad-fire);color:#fff;border-color:transparent;box-shadow:var(--glow-fire)}
+.st-judging{background:var(--grad-blue);color:#fff;border-color:transparent;box-shadow:0 10px 26px rgba(61,139,255,.4)}
+.st-champion{background:var(--grad-gold);color:#3a2800;border-color:transparent;box-shadow:var(--glow-gold)}
+.st-archived{background:rgba(255,255,255,.1);color:var(--mut);border-color:transparent}
+
+/* ---- vivid primary buttons ---- */
+.btn-fire{background:var(--grad-fire);box-shadow:var(--glow-fire)}
+.btn-fire:hover{box-shadow:0 14px 44px rgba(255,110,40,.6);transform:translateY(-2px)}
+.btn-gold{background:var(--grad-gold);color:#3a2800;box-shadow:var(--glow-gold)}
+.btn-gold:hover{box-shadow:0 14px 44px rgba(255,194,26,.55)}
+.bn-create{background:var(--grad-fire);box-shadow:var(--glow-fire)}
+
+/* ---- arena panels: full color energy ---- */
+.sp-rec{background:radial-gradient(120% 140% at 8% 0%,rgba(255,255,255,.18),transparent 40%),linear-gradient(140deg,#14e0b0,#0b9c7a 55%,#06604c);box-shadow:var(--glow-teal),var(--shadow-2)}
+.sp-beat{background:radial-gradient(120% 140% at 8% 0%,rgba(255,255,255,.14),transparent 40%),linear-gradient(140deg,#ff5a2e,#c22a12 55%,#7d1a0a);box-shadow:var(--glow-fire),var(--shadow-2)}
+.sp-create{background:radial-gradient(120% 140% at 8% 0%,rgba(255,255,255,.16),transparent 40%),linear-gradient(140deg,#8b5cff,#5b2fd4 55%,#341a80);box-shadow:var(--glow-violet),var(--shadow-2)}
+.sp-name{font-size:clamp(30px,5.6vw,44px)}
+.sp-flag{background:var(--grad-gold);box-shadow:var(--glow-gold)}
+
+/* ---- vivid card hover ---- */
+.v-card:hover,.ch-card:hover,.arena-card:hover{box-shadow:var(--shadow-3),0 0 0 1.5px rgba(255,90,46,.4)}
+
+/* ---- home hero more vivid ---- */
+.hero-flag{background:var(--grad-gold);color:#3a2800;box-shadow:var(--glow-gold)}
+.hero-open{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3)}
+.hi-livechip{border-color:rgba(20,224,176,.4);color:#3dffd0}
+.hi-livechip .live-dot{background:#14e0b0}
+.eq.on i{background:#14e0b0}
+
+/* ---- vivid hall banner + chase ---- */
+.hall-banner{background:linear-gradient(140deg,rgba(80,60,10,.6),rgba(30,22,4,.92));border-color:rgba(255,194,26,.4);box-shadow:var(--glow-gold),var(--shadow-2)}
+.hall-b-cta{background:var(--grad-gold);color:#3a2800}
+.chase-card{background:linear-gradient(140deg,rgba(90,26,10,.6),rgba(24,10,6,.92));border-color:rgba(255,90,46,.4);box-shadow:var(--glow-fire),var(--shadow-1)}
+.chase-live{color:#ff5a2e;background:rgba(255,90,46,.12);border-color:rgba(255,90,46,.35)}
+.chase-live i{background:#ff5a2e}
+.chase-cta{color:#ff8a5c}
+.newchamp-banner{background:linear-gradient(140deg,rgba(90,70,10,.6),rgba(30,24,4,.92));border-color:rgba(255,194,26,.4);box-shadow:var(--glow-gold),var(--shadow-1)}
+
+/* ---- nav: vivid active ---- */
+.bn-item.active{color:var(--text)}
+.bn-item.active::after{background:var(--grad-fire);box-shadow:var(--glow-fire)}
+.rail-item.active{background:var(--grad-fire);color:#fff;box-shadow:var(--glow-fire)}
+
+/* ---- vivid empty state icon ---- */
+.empty .ic{color:#ff8a5c}
+
+/* ---- vivid discovery overlays ---- */
+.djr-kicker{color:#ffd24d}
+.djr-follow{background:var(--grad-fire);color:#fff}
+.djr-act.djr-go{background:var(--grad-fire);box-shadow:var(--glow-fire)}
+
+/* ---- vivid score / record accents ---- */
+.hr2-score,.hr2-break{color:#fff}
+.hr2-break{background:var(--grad-fire);box-shadow:var(--glow-fire)}
+.hr2-ribbon{background:var(--grad-gold);color:#3a2800;box-shadow:var(--glow-gold)}
+.lb-pod-best,.lb-rec-holder b{color:#ffc21a}
+.pod.p1 .pod-thumb{box-shadow:var(--glow-gold),var(--shadow-2)}
+.jline-dot{background:#ffc21a;box-shadow:0 0 0 3px rgba(255,194,26,.25),0 0 14px rgba(255,194,26,.7)}
+
+/* ---- vivid category podium ---- */
+.pod.p1 .pod-medal{background:var(--grad-gold);box-shadow:var(--glow-gold)}
+.podium-sec{color:#ffc21a}
+
+/* ---- vivid trophy shelf ---- */
+.trophy-shelf{border-color:rgba(255,194,26,.3);background:linear-gradient(160deg,rgba(70,54,10,.4),rgba(22,17,6,.8))}
+.ts-item{color:#ffd84d;border-color:rgba(255,194,26,.3);background:rgba(255,194,26,.09)}
+.ts-item .ic{color:#ffc21a}
