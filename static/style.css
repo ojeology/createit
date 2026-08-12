@@ -3785,3 +3785,20 @@ body{background:linear-gradient(180deg,#0a0714 0%,#070810 40%,#06080e 100%) fixe
 .trophy-shelf{border-color:rgba(255,194,26,.3);background:linear-gradient(160deg,rgba(70,54,10,.4),rgba(22,17,6,.8))}
 .ts-item{color:#ffd84d;border-color:rgba(255,194,26,.3);background:rgba(255,194,26,.09)}
 .ts-item .ic{color:#ffc21a}
+
+
+/* v50 — Hall of Fame / records: race-board treatment, not a deck of cards */
+.record-race-board{position:relative;border-top:1px solid rgba(255,255,255,.13);background:linear-gradient(90deg,rgba(255,90,46,.045),transparent 30%,rgba(255,194,26,.035));}
+.record-race-board::before{content:"";position:absolute;left:31px;top:0;bottom:0;width:1px;background:linear-gradient(#ffb020,rgba(255,255,255,.09) 24%,rgba(255,255,255,.09) 78%,#ff5a2e);}
+.record-race-row{position:relative;display:grid;grid-template-columns:62px 82px minmax(0,1fr) auto 82px;align-items:center;gap:16px;min-height:112px;padding:14px 18px 14px 0;border-bottom:1px solid rgba(255,255,255,.10);cursor:pointer;overflow:hidden;transition:background .2s,transform .2s;}
+.record-race-row::after{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:transparent;transition:background .2s;}
+.record-race-row:hover{background:linear-gradient(90deg,rgba(255,90,46,.12),rgba(255,255,255,.025) 45%,rgba(255,194,26,.08));}
+.record-race-row:hover::after{background:var(--grad-fire)}
+.record-race-place{z-index:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-family:var(--display);font-size:20px;color:#929892;line-height:1;}
+.record-race-place .ic{color:#ffd24d}.record-race-leader .record-race-place{color:#ffd24d;text-shadow:0 0 18px rgba(255,194,26,.35)}
+.record-race-media{width:82px;height:82px;background:#171b1d;border:1px solid rgba(255,255,255,.14);overflow:hidden;position:relative;display:grid;place-items:center;color:#ffd24d;}
+.record-race-media::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,transparent 55%,rgba(255,90,46,.26));}.record-race-media img{width:100%;height:100%;object-fit:cover;filter:saturate(.9) contrast(1.08)}
+.record-race-main{min-width:0;display:flex;flex-direction:column;gap:6px}.record-race-kicker{font-family:var(--mono);font-size:9px;letter-spacing:.17em;color:#ffb020;font-weight:800}.record-race-kicker i{display:inline-block;width:5px;height:5px;margin:0 5px;border-radius:50%;background:#ff5a2e;box-shadow:0 0 10px #ff5a2e}.record-race-main>b{font-family:var(--display);font-size:21px;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.record-race-main>span{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--mut)}.record-race-main .avatar{width:23px;height:23px;font-size:10px}.record-race-main em{font-style:normal;color:var(--text);font-weight:700}.record-race-main small{color:var(--dim);font-size:10px;border-left:1px solid rgba(255,255,255,.15);padding-left:7px}
+.record-race-score{text-align:right;padding-right:4px}.record-race-score b{display:block;font-family:var(--display);font-size:30px;line-height:1;color:#fff}.record-race-score b em{font-style:normal;font-size:14px;color:#ffb020}.record-race-score span{font-family:var(--mono);font-size:8px;letter-spacing:.12em;color:var(--dim);white-space:nowrap}.record-race-leader .record-race-score b{color:#ffd24d}
+.record-race-go{width:70px;height:54px;border:1px solid rgba(255,90,46,.42);background:rgba(255,90,46,.1);color:#ff805b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-family:var(--mono);font-size:8px;font-weight:800;letter-spacing:.1em;cursor:pointer}.record-race-row:hover .record-race-go{background:var(--grad-fire);border-color:transparent;color:#fff;box-shadow:var(--glow-fire)}
+@media(max-width:620px){.record-race-row{grid-template-columns:43px 58px minmax(0,1fr) auto;gap:10px;min-height:90px;padding-right:10px}.record-race-board::before{left:21px}.record-race-media{width:58px;height:58px}.record-race-main>b{font-size:16px}.record-race-main small{display:none}.record-race-score b{font-size:23px}.record-race-go{display:none}.record-race-kicker{font-size:7.5px}.record-race-main>span{font-size:11px}}

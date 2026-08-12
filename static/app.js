@@ -520,7 +520,7 @@ document.addEventListener("click", async e => {
     else if (act === "disc-follow") { toggleFollow(el.dataset.user); }
     else if (act === "player-sound") {
       const v = $("#pl-video");
-      if (v) { v.muted = !v.muted; el.innerHTML = ic(v.muted ? "volumeX" : "volume2", 18); el.classList.toggle("on", !v.muted); }
+      if (v) { v.muted = !v.muted; if (!v.muted) { soloAudio(v); v.play().catch(() => {}); } el.innerHTML = ic(v.muted ? "volumeX" : "volume2", 18); el.classList.toggle("on", !v.muted); }
     }
     else if (act === "player-comments") {
       const p = $("#p-comments");
@@ -923,7 +923,7 @@ async function viewHome() {
   ${h ? `
   <div class="hero-stage">
     <div class="hero-media vid-frame" data-act="watch" data-vid="${h.original_video.id}" data-vlist="home-hero" style="cursor:pointer">
-      <video id="hero-video" src="${h.original_video.src}" poster="${h.original_video.poster || ""}" autoplay loop playsinline preload="auto"></video>
+      <video id="hero-video" src="${h.original_video.src}" poster="${h.original_video.poster || ""}" autoplay muted loop playsinline preload="metadata"></video>
       <div class="hero-grad"></div>
       <div class="hero-top">
         <span class="hero-flag">${ic("crown", 12)} CREATEIT OF THE WEEK · ${esc(h.code)}</span>
@@ -1461,9 +1461,25 @@ function hrCard(r, isLongest) {
     </div>
   </div>`;
 }
+function recordRaceRow(r, i, isLongest) {
+  const holder = r.champion;
+  return `<div class="record-race-row${isLongest ? " record-race-leader" : ""}" data-nav="/challenge/${r.challenge.id}">
+    <div class="record-race-place"><span>${String(i + 1).padStart(2, "0")}</span>${isLongest ? ic("crown", 14) : ""}</div>
+    <div class="record-race-media">
+      ${r.video?.poster ? `<img src="${r.video.poster}" alt="" loading="lazy">` : `<span>${ic("disc", 20)}</span>`}
+    </div>
+    <div class="record-race-main">
+      <div class="record-race-kicker">${isLongest ? "LONGEST REIGN" : "RECORD TO BEAT"} <i></i> ${esc(r.challenge.code)}</div>
+      <b>${esc(r.challenge.title)}</b>
+      <span>${avatar(holder, "sm")} <em>@${esc(holder.username)}</em> <small>${r.challengers || 0} challenger${r.challengers === 1 ? "" : "s"}</small></span>
+    </div>
+    <div class="record-race-score"><b>${holder.score}<em>%</em></b><span>${holder.unbeaten_days}D UNBEATEN</span></div>
+    <button class="record-race-go" aria-label="Try to break this record">${ic("zap", 16)}<span>BREAK</span></button>
+  </div>`;
+}
 function renderRecordsList(records, longestId) {
   if (!records.length) return `<div class="empty">${ic("disc", 24)}<br>No records yet. The arena is waiting.</div>`;
-  return `<div class="hr2-grid">${records.map(r => hrCard(r, r.challenge.id === longestId)).join("")}</div>`;
+  return `<div class="record-race-board">${records.map((r, i) => recordRaceRow(r, i, r.challenge.id === longestId)).join("")}</div>`;
 }
 function hallFilter(q) {
   const all = window.__RECORDS || [];
@@ -2779,42 +2795,53 @@ function updateBackBtn(path) {
   bb.style.display = show ? "inline-flex" : "none";
   bb.classList.toggle("show", show);
 }
-// GLOBAL AUDIO DIRECTOR: only one unmuted video at a time, ever
+// GLOBAL AUDIO DIRECTOR: one audible video at a time.
+// Any video that takes sound owns it exclusively; all others are stopped.
 function soloAudio(video) {
-  document.querySelectorAll("video").forEach(v => { if (v !== video && !v.muted) v.muted = true; });
+  document.querySelectorAll("video").forEach(v => {
+    if (v === video) return;
+    try { v.muted = true; v.pause(); } catch (e) {}
+  });
 }
 window.soloAudio = soloAudio;
+
+document.addEventListener("play", e => {
+  const video = e.target;
+  if (video instanceof HTMLVideoElement && !video.muted) soloAudio(video);
+}, true);
+document.addEventListener("volumechange", e => {
+  const video = e.target;
+  if (video instanceof HTMLVideoElement && !video.muted) soloAudio(video);
+}, true);
 
 function heroViewGate() {
   const hv = $("#hero-video");
   if (!hv || hv.dataset.gated) return;
   hv.dataset.gated = "1";
   new IntersectionObserver(es => es.forEach(en => {
-    if (en.isIntersecting) { if (!hv.__userPaused) hv.play().catch(() => {}); }
-    else { hv.pause(); hv.muted = true; }
+    if (en.isIntersecting) {
+      if (!hv.__userPaused) {
+        soloAudio(hv);
+        hv.muted = false;
+        hv.play().catch(() => { hv.muted = true; hv.play().catch(() => {}); });
+      }
+    } else {
+      // Leaving the landing hero must immediately end its audio.
+      hv.pause();
+      hv.muted = true;
+    }
   }), { threshold: 0.2 }).observe(hv);
 }
 
 function heroSoundArm() {
   const hv = $("#hero-video");
   if (!hv) return;
-  const btn = on => { const b = document.querySelector(".p-sound"); if (b) { b.innerHTML = ic(on ? "volume2" : "volumeX", 20); b.classList.toggle("on", on); } };
-  // AUTO-PLAY WITH SOUND. If the OS blocks audible autoplay, fall back to unmute on first touch.
+  // The landing creation starts with sound. If autoplay-with-sound is blocked,
+  // retain silent playback until the visitor explicitly toggles the control.
+  soloAudio(hv);
   hv.muted = false;
-  const p = hv.play();
-  if (p) p.then(() => { if (typeof soloAudio === "function") soloAudio(hv); btn(true); })
-    .catch(() => {
-      hv.muted = true;                       // OS blocked audible autoplay — keep it moving silently
-      hv.play().catch(() => {});
-      const onFirst = () => {                // sound switches on at the first touch, automatically
-        document.removeEventListener("pointerdown", onFirst);
-        hv.muted = false;
-        if (typeof soloAudio === "function") soloAudio(hv);
-        hv.play().catch(() => {});
-        btn(true);
-      };
-      document.addEventListener("pointerdown", onFirst);
-    });
+  const play = hv.play();
+  if (play) play.catch(() => { hv.muted = true; hv.play().catch(() => {}); });
 }
 
 function routeLine() {
