@@ -118,21 +118,19 @@ async function refreshMe() {
   try { const d = await api("/api/me"); ME = d.me; } catch (e) { ME = null; }
 }
 
-// ---------------- signature logo — THE BREAKTHROUGH MARK ----------------
-// Three ascending strokes of effort breaking through the record bar, igniting into a spark.
+// ---------------- signature logo — THE C / RISE MARK ----------------
+// A focused C encloses an upward creation arrow: create, compete, rise.
 let _logoN = 0;
 function logoSVG(size = 28) {
-  const id = "lg" + (++_logoN);
+  const id = "rise" + (++_logoN);
   return `<svg class="logo-mark" width="${size}" height="${size}" viewBox="0 0 96 96" fill="none" aria-hidden="true">
-    <defs><linearGradient id="${id}" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#FF3D1F"/><stop offset=".5" stop-color="#FF7A3C"/><stop offset="1" stop-color="#FFC42E"/>
+    <defs><linearGradient id="${id}" x1="36" y1="66" x2="68" y2="28" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF4F27"/><stop offset="1" stop-color="#FFA51F"/>
     </linearGradient></defs>
-    <path d="M12 58H46" stroke="url(#${id})" stroke-width="7" stroke-linecap="round" opacity=".4"/>
-    <path d="M66 58H84" stroke="url(#${id})" stroke-width="7" stroke-linecap="round" opacity=".4"/>
-    <path d="M22 80 33 52" stroke="url(#${id})" stroke-width="10" stroke-linecap="round" opacity=".5"/>
-    <path d="M38 82 53 42" stroke="url(#${id})" stroke-width="10" stroke-linecap="round" opacity=".8"/>
-    <path d="M54 84 73 24" stroke="url(#${id})" stroke-width="11" stroke-linecap="round"/>
-    <path class="lm-spark" d="M77 5l3.2 8.8L89 17l-8.8 3.2L77 29l-3.2-8.8L65 17l8.8-3.2z" fill="#E0A83F"/>
+    <rect x="4" y="4" width="88" height="88" rx="25" fill="#111419"/>
+    <rect x="4.5" y="4.5" width="87" height="87" rx="24.5" stroke="#F5F2E9" stroke-opacity=".1"/>
+    <path d="M68 22H43C27.6 22 18 32.3 18 48s9.6 26 25 26h25" stroke="#F5F2E9" stroke-width="11" stroke-linecap="round"/>
+    <path d="M52 64V35m0 0L41 46m11-11 11 11" stroke="url(#${id})" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
 }
 const brandHTML = (size = 26) => `<span class="brand">${logoSVG(size)}<span class="wm"><span class="wm-create">CREATE</span><span class="wm-it">IT</span></span></span>`;
