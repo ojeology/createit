@@ -1,51 +1,212 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>CREATEIT — Create It. Recreate It. Beat It.</title>
-<meta name="description" content="CreateIt is a social creativity and competition platform. Create something uniquely yours, let the world recreate it, then watch them try to beat it.">
-<meta name="theme-color" content="#090B0E">
-<link rel="icon" type="image/svg+xml" href="/static/brand-mark.svg?v=48">
-<link rel="apple-touch-icon" href="/static/apple-touch-icon.png?v=48">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,600;1,700;1,800&family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=48">
-<link rel="stylesheet" href="/static/redesign.css?v=48">
+  <meta charset="UTF-8">
+  <title>CREATEIT — Create It. Recreate It. Beat It.</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="logo.png" type="image/png">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- ═══════════ SIGNATURE SPLASH ═══════════ -->
-<div id="splash" aria-label="CreateIt intro">
-  <div class="sp-aura"></div>
-  <svg class="sp-logo" viewBox="0 0 96 96" fill="none" aria-hidden="true">
-    <defs>
-      <linearGradient id="splg" x1="36" y1="66" x2="68" y2="28" gradientUnits="userSpaceOnUse">
-        <stop stop-color="#FF4F27"/><stop offset="1" stop-color="#FFA51F"/>
-      </linearGradient>
-    </defs>
-    <rect x="4" y="4" width="88" height="88" rx="25" fill="#111419"/>
-    <rect x="4.5" y="4.5" width="87" height="87" rx="24.5" stroke="#F5F2E9" stroke-opacity=".1"/>
-    <path pathLength="1" class="sp-p" style="--pd:.03s" d="M68 22H43C27.6 22 18 32.3 18 48s9.6 26 25 26h25" stroke="#F5F2E9" stroke-width="11" stroke-linecap="round"/>
-    <path pathLength="1" class="sp-p" style="--pd:.14s" d="M52 64V35m0 0L41 46m11-11 11 11" stroke="url(#splg)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>
-  <div class="sp-wordwrap">
-    <div class="sp-word2"><span class="sp-b1">CREATE</span><span class="sp-b2">IT</span></div>
+  <!-- Splash screen -->
+  <div id="splash">
+    <div class="sp-aura"></div>
+    <div class="sp-logo">
+      <svg width="96" height="96" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <text x="50" y="50" font-family="var(--display)" font-size="40" dominant-baseline="middle"
+          text-anchor="middle" class="sp-l accent">CREATE</text>
+        <text x="50" y="70" font-family="var(--display)" font-size="40" dominant-baseline="middle"
+          text-anchor="middle" class="sp-l it">IT</text>
+      </svg>
+    </div>
+    <div class="sp-word">
+      <span class="sp-b1">CREATE</span>
+      <span class="sp-b2 accent">IT</span>
+    </div>
+    <div class="sp-steps">
+      <div class="sp-step s1">CREATE</div>
+      <div class="sp-step s2">RECREATE</div>
+      <div class="sp-step s3">BEAT IT</div>
+    </div>
+    <p class="sp-skip">Skip</p>
   </div>
-  <div class="sp-tag">Create It · Recreate It · Beat It</div>
-</div>
 
-<div id="bg-grain"></div>
-<div id="railnav"></div>
-<div id="topbar"></div>
-<main id="app"><div class="loading"><div class="spinner"></div><p>LOADING THE ARENA…</p></div></main>
-<nav id="bottomnav"></nav>
-<div id="player-root"></div>
-<div id="modal-root"></div>
-<div id="toast-root"></div>
-<script>try{var _p=localStorage.getItem('ci-theme')||'dark';var _d=_p==='dark'||(_p==='system'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);if(_d)document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
-<script src="/static/app.js?v=51"></script>
-<script src="/static/djr.js?v=51"></script>
+  <!-- Top bar -->
+  <header id="topbar">
+    <div class="brand">
+      <svg class="logo-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <text x="50" y="50" font-family="var(--display)" font-size="35" dominant-baseline="middle"
+          text-anchor="middle" class="accent">IT</text>
+      </svg>
+      <div class="wordmark">
+        <span class="w-it">CREATE</span>IT
+      </div>
+    </div>
+    <div class="tb-spacer"></div>
+    <div>
+      <button class="icon-btn" aria-label="Notifications">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M8 14l2-2l8 8"></path>
+        </svg>
+        <span class="dot-badge">3</span>
+      </button>
+      <button class="icon-btn" aria-label="Profile">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="app">
+    <!-- Hero / featured challenge -->
+    <section class="hero">
+      <div class="hero-media">
+        <video playsinline autoploop muted>
+          <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/Sample Videos/BigBuckBunny.mp4" type="video/mp4">
+          Your browser does not support the video tag.
+        </video>
+      </div>
+      <div class="hero-body">
+        <div class="hero-code">#001</div>
+        <h1 class="hero-title">Master the Beat</h1>
+        <p class="hero-meta">
+          <b>Posted:</b> 2 days ago •
+          <b>Views:</b> 12.4k
+        </p>
+        <div class="hero-cta">
+          <button class="btn btn-fire">Attempt</button>
+          <button class="btn btn-violet">Watch</button>
+        </div>
+        <div class="week-ribbon">
+          <div class="wr-1">WEEK 3</div>
+          <div class="wr-2">Featured Challenge</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Challenges grid -->
+    <section class="sec">
+      <h2>Recent Challenges</h2>
+      <a href="#" class="more">View all</a>
+    </section>
+
+    <div class="hscroll">
+      <div class="grid3">
+        <article class="ch-card">
+          <div class="ch-thumb">
+            <video playsinline loop muted>
+              <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/Sample Videos/BigBuckBunny.mp4" type="video/mp4">
+            </video>
+            <div class="veil"></div>
+            <div class="corner">NEW</div>
+          </div>
+          <div class="ch-body">
+            <div class="ch-code">#012</div>
+            <h3 class="ch-title">Fire Spin Remix</h3>
+            <p class="ch-by">by <b>AlexRider</b></p>
+            <div class="progress t-teal">
+              <div style="width:75%"></div>
+            </div>
+            <div class="progress-line">
+              <span>75% qualified</span>
+              <b>3 attempts</b>
+            </div>
+          </div>
+        </article>
+
+        <article class="ch-card">
+          <div class="ch-thumb">
+            <video playsinline loop muted>
+              <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/Sample Videos/BigBuckBunny.mp4" type="video/mp4">
+            </video>
+            <div class="veil"></div>
+          </div>
+          <div class="ch-body">
+            <div class="ch-code">#015</div>
+            <h3 class="ch-title">Glitch Sync</h3>
+            <p class="ch-by">by <b>MayaD</b></p>
+            <div class="progress t-gold">
+              <div style="width:100%"></div>
+            </div>
+            <div class="progress-line">
+              <span>100% qualified</span>
+              <b>1 attempt</b>
+            </div>
+          </div>
+        </article>
+
+        <article class="ch-card">
+          <div class="ch-thumb">
+            <video playsinline loop muted>
+              <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/Sample Videos/BigBuckBunny.mp4" type="video/mp4">
+            </video>
+            <div class="veil"></div>
+          </div>
+          <div class="ch-body">
+            <div class="ch-code">#018</div>
+            <h3 class="ch-title">Echo Chamber</h3>
+            <p class="ch-by">by <b>LunaV</b></p>
+            <div class="progress">
+              <div style="width:42%"></div>
+            </div>
+            <div class="progress-line">
+              <span>42% qualified</span>
+              <b>5 attempts</b>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+
+    <!-- Stage track -->
+    <div class="stage-track">
+      <div class="st-step now"><div class="n">1</div><div class="l">CREATE</div></div>
+      <div class="st-step"><div class="n">2</div><div class="l">RECREATE</div></div>
+      <div class="st-step"><div class="n">3</div><div class="l">BEAT IT</div></div>
+      <div class="st-join"></div>
+    </stage-track>
+  </main>
+
+  <!-- Bottom nav -->
+  <nav id="bottomnav">
+    <button class="bn-item active">
+      <span class="ico">🏠</span>
+      <span>Home</span>
+    </button>
+    <button class="bn-item">
+      <span class="ico">➕</span>
+      <span>Create</span>
+    </button>
+    <button class="bn-create">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      Attempt
+    </button>
+    <button class="bn-item">
+      <span class="ico">👁️</span>
+      <span>Explore</span>
+    </button>
+    <button class="bn-item">
+      <span class="ico">👤</span>
+      <span>Profile</span>
+    </button>
+  </nav>
+
+  <script>
+    // Simple splash hide after 3s
+    document.addEventListener('DOMContentLoaded', () => {
+      const splash = document.getElementById('splash');
+      if (splash) {
+        setTimeout(() => splash.classList.add('sp-exit'), 3000);
+        setTimeout(() => splash.style.display = 'none', 3400);
+      }
+    });
+  </script>
 </body>
 </html>
