@@ -14,15 +14,15 @@
     <div class="sp-aura"></div>
     <div class="sp-logo">
       <svg width="96" height="96" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-        <text x="50" y="50" font-family="var(--display)" font-size="40" dominant-baseline="middle"
-          text-anchor="middle" class="sp-l accent">CREATE</text>
-        <text x="50" y="70" font-family="var(--display)" font-size="40" dominant-baseline="middle"
-          text-anchor="middle" class="sp-l it">IT</text>
+        <text x="50" y="50" font-family="var(--display)" font-size="42" dominant-baseline="middle"
+          text-anchor="middle" class="sp-l pink">CREATE</text>
+        <text x="50" y="72" font-family="var(--display)" font-size="42" dominant-baseline="middle"
+          text-anchor="middle" class="sp-l blue">IT</text>
       </svg>
     </div>
     <div class="sp-word">
       <span class="sp-b1">CREATE</span>
-      <span class="sp-b2 accent">IT</span>
+      <span class="sp-b2 pink">IT</span>
     </div>
     <div class="sp-steps">
       <div class="sp-step s1">CREATE</div>
@@ -37,10 +37,10 @@
     <div class="brand">
       <svg class="logo-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
         <text x="50" y="50" font-family="var(--display)" font-size="35" dominant-baseline="middle"
-          text-anchor="middle" class="accent">IT</text>
+          text-anchor="middle" class="pink">IT</text>
       </svg>
       <div class="wordmark">
-        <span class="w-it">CREATE</span>IT
+        <span class="pink">CREATE</span>IT
       </div>
     </div>
     <div class="tb-spacer"></div>
@@ -62,12 +62,42 @@
   </header>
 
   <main id="app">
-    <!-- Hero / featured challenge -->
-    <section class="hero">
+    <!-- TikTok‑style For You feed -->
+    <section class="fy-feed">
+      <div class="fy-track" id="fy-track">
+        <!-- Cards will be injected by JS; placeholder -->
+        <article class="fy-card">
+          <div class="fy-media">
+            <video playsinline autoplay muted>
+              <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/Sample Videos/BigBuckBunny.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="fy-actions">
+            <button class="fy-like"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2l-11.5 7.5L5 20l6.9-4.6L2 22l10-6z"/></svg></button>
+            <span class="fy-count">0</span>
+            <button class="fy-share"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L12 14.76l-5.43 2.29a2 2 0 0 1-2.83-2.83l7.17-7.17a2 2 0 0 1 2.83 0z"/></svg></button>
+          </div>
+          <div class="fy-info">
+            <div class="fy-creator">CreatorName</div>
+            <div class="fy-desc">Challenge #001: master the beat</div>
+          </div>
+        </article>
+        <!-- repeat as needed -->
+      </div>
+    </section>
+
+    <!-- Stage pills (CREATE → RECREATE → BEAT IT) -->
+    <div class="stage-pills">
+      <span class="pill pink" data-stage="create">CREATE</span>
+      <span class="pill blue" data-stage="recreate">RECREATE</span>
+      <span class="pill purple" data-stage="beat">BEAT IT</span>
+    </div>
+
+    <!-- Hero / featured challenge (optional) -->
+    <section class="hero-section">
       <div class="hero-media">
-        <video playsinline autoploop muted>
+        <video playsinline autoplay muted>
           <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/Sample Videos/BigBuckBunny.mp4" type="video/mp4">
-          Your browser does not support the video tag.
         </video>
       </div>
       <div class="hero-body">
@@ -78,100 +108,14 @@
           <b>Views:</b> 12.4k
         </p>
         <div class="hero-cta">
-          <button class="btn btn-fire">Attempt</button>
-          <button class="btn btn-violet">Watch</button>
-        </div>
-        <div class="week-ribbon">
-          <div class="wr-1">WEEK 3</div>
-          <div class="wr-2">Featured Challenge</div>
+          <button class="btn pink">Attempt</button>
+          <button class="btn blue">Watch</button>
         </div>
       </div>
     </section>
-
-    <!-- Challenges grid -->
-    <section class="sec">
-      <h2>Recent Challenges</h2>
-      <a href="#" class="more">View all</a>
-    </section>
-
-    <div class="hscroll">
-      <div class="grid3">
-        <article class="ch-card">
-          <div class="ch-thumb">
-            <video playsinline loop muted>
-              <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/Sample Videos/BigBuckBunny.mp4" type="video/mp4">
-            </video>
-            <div class="veil"></div>
-            <div class="corner">NEW</div>
-          </div>
-          <div class="ch-body">
-            <div class="ch-code">#012</div>
-            <h3 class="ch-title">Fire Spin Remix</h3>
-            <p class="ch-by">by <b>AlexRider</b></p>
-            <div class="progress t-teal">
-              <div style="width:75%"></div>
-            </div>
-            <div class="progress-line">
-              <span>75% qualified</span>
-              <b>3 attempts</b>
-            </div>
-          </div>
-        </article>
-
-        <article class="ch-card">
-          <div class="ch-thumb">
-            <video playsinline loop muted>
-              <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/Sample Videos/BigBuckBunny.mp4" type="video/mp4">
-            </video>
-            <div class="veil"></div>
-          </div>
-          <div class="ch-body">
-            <div class="ch-code">#015</div>
-            <h3 class="ch-title">Glitch Sync</h3>
-            <p class="ch-by">by <b>MayaD</b></p>
-            <div class="progress t-gold">
-              <div style="width:100%"></div>
-            </div>
-            <div class="progress-line">
-              <span>100% qualified</span>
-              <b>1 attempt</b>
-            </div>
-          </div>
-        </article>
-
-        <article class="ch-card">
-          <div class="ch-thumb">
-            <video playsinline loop muted>
-              <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/Sample Videos/BigBuckBunny.mp4" type="video/mp4">
-            </video>
-            <div class="veil"></div>
-          </div>
-          <div class="ch-body">
-            <div class="ch-code">#018</div>
-            <h3 class="ch-title">Echo Chamber</h3>
-            <p class="ch-by">by <b>LunaV</b></p>
-            <div class="progress">
-              <div style="width:42%"></div>
-            </div>
-            <div class="progress-line">
-              <span>42% qualified</span>
-              <b>5 attempts</b>
-            </div>
-          </div>
-        </article>
-      </div>
-    </div>
-
-    <!-- Stage track -->
-    <div class="stage-track">
-      <div class="st-step now"><div class="n">1</div><div class="l">CREATE</div></div>
-      <div class="st-step"><div class="n">2</div><div class="l">RECREATE</div></div>
-      <div class="st-step"><div class="n">3</div><div class="l">BEAT IT</div></div>
-      <div class="st-join"></div>
-    </stage-track>
   </main>
 
-  <!-- Bottom nav -->
+  <!-- Bottom navigation (TikTok style) -->
   <nav id="bottomnav">
     <button class="bn-item active">
       <span class="ico">🏠</span>
@@ -181,7 +125,7 @@
       <span class="ico">➕</span>
       <span>Create</span>
     </button>
-    <button class="bn-create">
+    <button class="bn-create pink">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="12" y1="5" x2="12" y2="19"></line>
         <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -199,14 +143,47 @@
   </nav>
 
   <script>
-    // Simple splash hide after 3s
+    // Simple splash hide
     document.addEventListener('DOMContentLoaded', () => {
       const splash = document.getElementById('splash');
       if (splash) {
-        setTimeout(() => splash.classList.add('sp-exit'), 3000);
-        setTimeout(() => splash.style.display = 'none', 3400);
+        setTimeout(() => splash.classList.add('sp-out'), 3500);
+        setTimeout(() => splash.style.display = 'none', 3900);
       }
     });
+
+    // Tiny swipe‑able feed (basic, no external libs)
+    (() => {
+      const track = document.getElementById('fy-track');
+      if (!track) return;
+      let startX = 0;
+      let isDown = false;
+      const cards = track.querySelectorAll('.fy-card');
+      const cardWidth = cards[0]?.offsetWidth || 360;
+
+      track.addEventListener('pointerdown', (e) => {
+        isDown = true;
+        startX = e.clientX - track.offsetLeft;
+        track.style.cursor = 'grabbing';
+      });
+      track.addEventListener('pointerup', () => {
+        isDown = false;
+        track.style.cursor = 'grab';
+      });
+      track.addEventListener('pointermove', (e) => {
+        if (!isDown) return;
+        const x = e.clientX - track.offsetLeft;
+        const walk = (x - startX) * 0.8; // smooth factor
+        track.scrollLeft = Math.max(0, track.scrollLeft - walk);
+      });
+      // auto‑scroll marquee effect (optional)
+      let direction = 1;
+      setInterval(() => {
+        track.scrollLeft += direction * 2;
+        if (track.scrollLeft + track.clientWidth >= track.scrollWidth) direction = -1;
+        if (track.scrollLeft <= 0) direction = 1;
+      }, 3000);
+    })();
   </script>
 </body>
 </html>
